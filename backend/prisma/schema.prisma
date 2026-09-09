@@ -1,0 +1,159 @@
+// Prisma Schema for Social Discovery Backend
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum Gender {
+  WOMAN
+  MAN
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+}
+
+// User account identity
+model User {
+  id                 String          @id @default(uuid())
+  phoneNumber        String          @unique @map("phone_number")
+  countryCode        String          @default("+91") @map("country_code")
+  isPhoneVerified    Boolean         @default(false) @map("is_phone_verified")
+  isActive           Boolean         @default(true) @map("is_active")
+  hashedRefreshToken String?         @map("hashed_refresh_token")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  profile            Profile?
+  photos             Photo[]
+  userInterests      UserInterest[]
+  preferences        UserPreference?
+
+  @@map("users")
+}
+
+// One-Time Passwords for Phone Authentication
+model OtpRecord {
+  id          String   @id @default(uuid())
+  phoneNumber String   @map("phone_number")
+  otpHash     String   @map("otp_hash")
+  attempts    Int      @default(0)
+  expiresAt   DateTime @map("expires_at")
+  isUsed      Boolean  @default(false) @map("is_used")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([phoneNumber])
+  @@map("otp_records")
+}
+
+// User Profile Details
+model Profile {
+  id                 String             @id @default(uuid())
+  userId             String             @unique @map("user_id")
+  name               String
+  username           String?            @unique
+  birthdate          DateTime?
+  age                Int?
+  gender             String?
+  bio                String?            @db.Text
+  locationName       String?            @map("location_name")
+  online             Boolean            @default(false)
+  isAvailable        Boolean            @default(true) @map("is_available")
+  intent             String?
+  avatarUrl          String?            @map("avatar_url")
+  coverPhotoUrl      String?            @map("cover_photo_url")
+  verificationStatus VerificationStatus @default(UNVERIFIED) @map("verification_status")
+  likesCount         Int                @default(0) @map("likes_count")
+  commentsCount      Int                @default(0) @map("comments_count")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([username])
+  @@index([verificationStatus])
+  @@map("profiles")
+}
+
+// User Gallery Photos
+model Photo {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  url       String
+  order     Int      @default(0)
+  isMain    Boolean  @default(false) @map("is_main")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("photos")
+}
+
+// Global Interest Catalog
+model Interest {
+  id            String         @id @default(uuid())
+  name          String         @unique
+  category      String?
+  icon          String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  userInterests UserInterest[]
+
+  @@map("interests")
+}
+
+// User Selected Interests (Join Table)
+model UserInterest {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  interestId String   @map("interest_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interest   Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, interestId])
+  @@index([userId])
+  @@index([interestId])
+  @@map("user_interests")
+}
+
+// User Discovery Preferences
+model UserPreference {
+  id                   String   @id @default(uuid())
+  userId               String   @unique @map("user_id")
+  minAge               Int      @default(18) @map("min_age")
+  maxAge               Int      @default(99) @map("max_age")
+  maxDistanceKm        Int      @default(50) @map("max_distance_km")
+  preferredGenders     String[] @default([]) @map("preferred_genders")
+  preferredIntents     String[] @default([]) @map("preferred_intents")
+  notificationsEnabled Boolean  @default(true) @map("notifications_enabled")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+// Health check model
+model HealthCheck {
+  id        String   @id @default(uuid())
+  status    String   @default("ok")
+  checkedAt DateTime @default(now()) @map("checked_at")
+
+  @@map("health_checks")
+}
