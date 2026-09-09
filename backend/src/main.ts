@@ -65,6 +65,7 @@ async function bootstrap() {
       .addTag('Verification', 'Selfie face liveness and identity verification')
       .addTag('Locations', 'User GPS coordinates and geographic tracking')
       .addTag('Discovery', 'Nearby user discovery feed, distance filtering, and like matching')
+      .addTag('Matching', 'Talk Now live queue, compatibility algorithm, and real-time pairing')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);

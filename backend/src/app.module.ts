@@ -12,6 +12,7 @@ import { PreferencesModule } from './preferences/preferences.module';
 import { VerificationModule } from './verification/verification.module';
 import { LocationsModule } from './locations/locations.module';
 import { DiscoveryModule } from './discovery/discovery.module';
+import { MatchingModule } from './matching/matching.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { DiscoveryModule } from './discovery/discovery.module';
     VerificationModule,
     LocationsModule,
     DiscoveryModule,
+    MatchingModule,
   ],
 })
 export class AppModule {}
