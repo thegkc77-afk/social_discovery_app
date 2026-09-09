@@ -24,6 +24,14 @@ enum Gender {
   PREFER_NOT_TO_SAY
 }
 
+enum MeetupStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  COMPLETED
+}
+
 // User account identity
 model User {
   id                  String               @id @default(uuid())
@@ -53,6 +61,13 @@ model User {
   // Chat memberships and messages
   chatMembers         ChatMember[]
   sentMessages        Message[]            @relation("SentMessages")
+
+  // Meetup invitations
+  createdMeetups      Meetup[]             @relation("CreatedMeetups")
+  receivedMeetups     Meetup[]             @relation("ReceivedMeetups")
+
+  // Notifications
+  notifications       Notification[]
 
   @@map("users")
 }
@@ -239,6 +254,7 @@ model Chat {
 
   members   ChatMember[]
   messages  Message[]
+  meetups   Meetup[]
 
   @@map("chats")
 }
@@ -278,6 +294,50 @@ model Message {
   @@index([chatId, createdAt])
   @@index([senderId])
   @@map("messages")
+}
+
+// Meetup Invitations & State Machine
+model Meetup {
+  id          String       @id @default(uuid())
+  chatId      String?      @map("chat_id")
+  creatorId   String       @map("creator_id")
+  recipientId String       @map("recipient_id")
+  place       String
+  date        String
+  time        String
+  note        String?      @db.Text
+  status      MeetupStatus @default(PENDING)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  creator     User         @relation("CreatedMeetups", fields: [creatorId], references: [id], onDelete: Cascade)
+  recipient   User         @relation("ReceivedMeetups", fields: [recipientId], references: [id], onDelete: Cascade)
+  chat        Chat?        @relation(fields: [chatId], references: [id], onDelete: SetNull)
+
+  @@index([creatorId])
+  @@index([recipientId])
+  @@index([chatId])
+  @@index([status])
+  @@map("meetups")
+}
+
+// Notifications & Alerts
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  type      String
+  title     String
+  body      String    @db.Text
+  data      Json?
+  isRead    Boolean   @default(false) @map("is_read")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }
 
 // Health check model

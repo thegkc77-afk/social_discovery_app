@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { validate } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
@@ -14,6 +15,8 @@ import { LocationsModule } from './locations/locations.module';
 import { DiscoveryModule } from './discovery/discovery.module';
 import { MatchingModule } from './matching/matching.module';
 import { ChatsModule } from './chats/chats.module';
+import { MeetupsModule } from './meetups/meetups.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -22,6 +25,12 @@ import { ChatsModule } from './chats/chats.module';
       validate,
       envFilePath: ['.env', '.env.example'],
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     PrismaModule,
     HealthModule,
     AuthModule,
@@ -35,6 +44,8 @@ import { ChatsModule } from './chats/chats.module';
     DiscoveryModule,
     MatchingModule,
     ChatsModule,
+    MeetupsModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}
