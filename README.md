@@ -1,29 +1,36 @@
-# Welcome to your Expo app 👋
+# Social Discovery App 📱
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A modern location- and vibe-based social discovery mobile application built with React Native and Expo.
 
-## Get started
+## Project Structure
 
-1. Install dependencies
+- **`frontend/`**: The React Native / Expo mobile application codebase (Expo Router, UI components, assets, services).
+
+## Getting Started
+
+1. Navigate to the `frontend` directory:
+
+   ```bash
+   cd frontend
+   ```
+
+2. Install dependencies (if not already installed):
 
    ```bash
    npm install
    ```
 
-2. Start the app
+3. Start the Expo development server:
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+You can run the app using:
+- **Expo Go** (scan QR code)
+- **iOS Simulator** (`npm run ios` or `i` in terminal)
+- **Android Emulator** (`npm run android` or `a` in terminal)
+- **Web** (`npm run web` or `w` in terminal)
 
 ## Get a fresh project
 
