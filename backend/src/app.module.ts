@@ -13,6 +13,7 @@ import { VerificationModule } from './verification/verification.module';
 import { LocationsModule } from './locations/locations.module';
 import { DiscoveryModule } from './discovery/discovery.module';
 import { MatchingModule } from './matching/matching.module';
+import { ChatsModule } from './chats/chats.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { MatchingModule } from './matching/matching.module';
     LocationsModule,
     DiscoveryModule,
     MatchingModule,
+    ChatsModule,
   ],
 })
 export class AppModule {}
