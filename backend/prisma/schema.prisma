@@ -26,19 +26,20 @@ enum Gender {
 
 // User account identity
 model User {
-  id                 String          @id @default(uuid())
-  phoneNumber        String          @unique @map("phone_number")
-  countryCode        String          @default("+91") @map("country_code")
-  isPhoneVerified    Boolean         @default(false) @map("is_phone_verified")
-  isActive           Boolean         @default(true) @map("is_active")
-  hashedRefreshToken String?         @map("hashed_refresh_token")
-  createdAt          DateTime        @default(now()) @map("created_at")
-  updatedAt          DateTime        @updatedAt @map("updated_at")
+  id                  String               @id @default(uuid())
+  phoneNumber         String               @unique @map("phone_number")
+  countryCode         String               @default("+91") @map("country_code")
+  isPhoneVerified     Boolean              @default(false) @map("is_phone_verified")
+  isActive            Boolean              @default(true) @map("is_active")
+  hashedRefreshToken  String?              @map("hashed_refresh_token")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
 
-  profile            Profile?
-  photos             Photo[]
-  userInterests      UserInterest[]
-  preferences        UserPreference?
+  profile             Profile?
+  photos              Photo[]
+  userInterests       UserInterest[]
+  preferences         UserPreference?
+  verificationRecords VerificationRecord[]
 
   @@map("users")
 }
@@ -84,6 +85,24 @@ model Profile {
   @@index([username])
   @@index([verificationStatus])
   @@map("profiles")
+}
+
+// User Verification Submissions & Liveness Logs
+model VerificationRecord {
+  id          String             @id @default(uuid())
+  userId      String             @map("user_id")
+  selfieUrl   String             @map("selfie_url")
+  status      VerificationStatus @default(PENDING)
+  confidence  Float?
+  notes       String?
+  submittedAt DateTime           @default(now()) @map("submitted_at")
+  reviewedAt  DateTime?          @map("reviewed_at")
+
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("verification_records")
 }
 
 // User Gallery Photos

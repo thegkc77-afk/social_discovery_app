@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Put,
+  Post,
   Patch,
   Body,
   Param,
@@ -45,5 +46,16 @@ export class ProfilesController {
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     return this.profilesService.update(userId, updateProfileDto);
+  }
+
+  @Post(':userId/onboarding')
+  @ApiOperation({ summary: 'Complete full user onboarding in one step' })
+  @ApiParam({ name: 'userId', description: 'User UUID' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Onboarding completed and profile populated' })
+  completeOnboarding(
+    @Param('userId') userId: string,
+    @Body() completeOnboardingDto: import('./dto/complete-onboarding.dto').CompleteOnboardingDto,
+  ) {
+    return this.profilesService.completeOnboarding(userId, completeOnboardingDto);
   }
 }

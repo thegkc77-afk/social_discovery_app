@@ -62,6 +62,7 @@ async function bootstrap() {
       .addTag('Interests', 'Global interests catalog and user-selected vibe tags')
       .addTag('Photos', 'User gallery photos and main avatar management')
       .addTag('Preferences', 'Discovery matching preferences and age/distance filters')
+      .addTag('Verification', 'Selfie face liveness and identity verification')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
