@@ -63,6 +63,8 @@ async function bootstrap() {
       .addTag('Photos', 'User gallery photos and main avatar management')
       .addTag('Preferences', 'Discovery matching preferences and age/distance filters')
       .addTag('Verification', 'Selfie face liveness and identity verification')
+      .addTag('Locations', 'User GPS coordinates and geographic tracking')
+      .addTag('Discovery', 'Nearby user discovery feed, distance filtering, and like matching')
       .build();
 
     const document = SwaggerModule.createDocument(app, config);

@@ -36,12 +36,71 @@ model User {
   updatedAt           DateTime             @updatedAt @map("updated_at")
 
   profile             Profile?
+  location            Location?
   photos              Photo[]
   userInterests       UserInterest[]
   preferences         UserPreference?
   verificationRecords VerificationRecord[]
+  
+  // Likes sent and received
+  sentLikes           Like[]               @relation("SentLikes")
+  receivedLikes       Like[]               @relation("ReceivedLikes")
+
+  // Matches
+  matchesAsUser1      Match[]              @relation("User1Matches")
+  matchesAsUser2      Match[]              @relation("User2Matches")
 
   @@map("users")
+}
+
+// User Geographic Location
+model Location {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  latitude  Float
+  longitude Float
+  accuracy  Float?
+  city      String?
+  country   String?
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([latitude, longitude])
+  @@map("locations")
+}
+
+// Likes between Users
+model Like {
+  id         String   @id @default(uuid())
+  fromUserId String   @map("from_user_id")
+  toUserId   String   @map("to_user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  fromUser   User     @relation("SentLikes", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("ReceivedLikes", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([fromUserId, toUserId])
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@map("likes")
+}
+
+// Mutual Matches
+model Match {
+  id        String   @id @default(uuid())
+  user1Id   String   @map("user1_id")
+  user2Id   String   @map("user2_id")
+  matchedAt DateTime @default(now()) @map("matched_at")
+  isActive  Boolean  @default(true) @map("is_active")
+
+  user1     User     @relation("User1Matches", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2     User     @relation("User2Matches", fields: [user2Id], references: [id], onDelete: Cascade)
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+  @@map("matches")
 }
 
 // One-Time Passwords for Phone Authentication

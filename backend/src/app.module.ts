@@ -10,6 +10,8 @@ import { InterestsModule } from './interests/interests.module';
 import { PhotosModule } from './photos/photos.module';
 import { PreferencesModule } from './preferences/preferences.module';
 import { VerificationModule } from './verification/verification.module';
+import { LocationsModule } from './locations/locations.module';
+import { DiscoveryModule } from './discovery/discovery.module';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { VerificationModule } from './verification/verification.module';
     PhotosModule,
     PreferencesModule,
     VerificationModule,
+    LocationsModule,
+    DiscoveryModule,
   ],
 })
 export class AppModule {}
