@@ -3,7 +3,8 @@ import { View, Image, StyleSheet, ViewStyle } from 'react-native';
 import { Colors } from '../../constants/theme';
 
 interface AvatarProps {
-  source: string;
+  source?: string;
+  uri?: string;
   size?: number;
   showOnlineStatus?: boolean;
   online?: boolean;
@@ -14,6 +15,7 @@ interface AvatarProps {
 
 export default function Avatar({
   source,
+  uri,
   size = 50,
   showOnlineStatus = false,
   online = false,
@@ -45,10 +47,23 @@ export default function Avatar({
     backgroundColor: online ? Colors.success : Colors.textMuted,
   };
 
-  // Safe checks for require vs http uri
-  const imageSource = source && typeof source === 'string' && source.startsWith('http')
-    ? { uri: source }
-    : require('@/assets/images/favicon.png');
+  const avatarUri = uri || source;
+  // Support remote HTTP, local file://, content://, data: and local path URIs
+  const isUriString =
+    typeof avatarUri === 'string' &&
+    (avatarUri.startsWith('http') ||
+      avatarUri.startsWith('file') ||
+      avatarUri.startsWith('content') ||
+      avatarUri.startsWith('data:') ||
+      avatarUri.startsWith('blob:') ||
+      avatarUri.startsWith('/') ||
+      avatarUri.includes('/'));
+
+  const imageSource = isUriString
+    ? { uri: avatarUri }
+    : typeof avatarUri === 'number'
+    ? avatarUri
+    : require('../../../assets/images/favicon.png');
 
   return (
     <View style={[styles.container, containerStyle, style]}>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,44 +12,66 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Colors } from '../../constants/theme';
+import { ArrowRight } from 'lucide-react-native';
 import Button from '../../components/ui/Button';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import { verifyOTP, sendOTP } from '../../services/auth';
+import { useOnboarding } from '../../context/OnboardingContext';
+
+const RESEND_SECONDS = 30;
 
 export default function OtpScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const onboarding = useOnboarding();
   const phone = (params.phone as string) || '';
+  const dialCode = (params.dialCode as string) || onboarding.countryCode || '+91';
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(0);
 
-  // References for the TextInput fields
-  const inputRefs = [
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
-  ];
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const timer = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [secondsLeft]);
+
+  const ref0 = useRef<TextInput>(null);
+  const ref1 = useRef<TextInput>(null);
+  const ref2 = useRef<TextInput>(null);
+  const ref3 = useRef<TextInput>(null);
+  const ref4 = useRef<TextInput>(null);
+  const ref5 = useRef<TextInput>(null);
+  const inputRefs = [ref0, ref1, ref2, ref3, ref4, ref5];
+
+  const applyDigits = (digits: string) => {
+    const chars = digits.replace(/[^0-9]/g, '').slice(0, 6).split('');
+    const newOtp = ['', '', '', '', '', ''];
+    chars.forEach((c, i) => (newOtp[i] = c));
+    setOtp(newOtp);
+    const nextEmptyIndex = chars.length < 6 ? chars.length : 5;
+    inputRefs[nextEmptyIndex].current?.focus();
+  };
 
   const handleTextChange = (text: string, index: number) => {
+    if (text.length > 1) {
+      applyDigits(text);
+      return;
+    }
     const digit = text.replace(/[^0-9]/g, '');
     const newOtp = [...otp];
     newOtp[index] = digit;
     setOtp(newOtp);
 
-    // Auto focus next box
     if (digit && index < 5) {
       inputRefs[index + 1].current?.focus();
     }
   };
 
   const handleKeyPress = (e: any, index: number) => {
-    // Handle backspace back tracking
     if (e.nativeEvent.key === 'Backspace') {
       const newOtp = [...otp];
       if (otp[index] === '' && index > 0) {
@@ -70,7 +92,7 @@ export default function OtpScreen() {
     if (!isOtpComplete) return;
     setLoading(true);
     try {
-      const success = await verifyOTP(`+91${phone}`, enteredOtp);
+      const success = await verifyOTP(`${dialCode}${phone}`, enteredOtp);
       if (success) {
         router.push('/onboarding/profile');
       } else {
@@ -85,9 +107,11 @@ export default function OtpScreen() {
   };
 
   const handleResendCode = async () => {
+    if (secondsLeft > 0) return;
     setResending(true);
     try {
-      await sendOTP(`+91${phone}`);
+      await sendOTP(`${dialCode}${phone}`);
+      setSecondsLeft(RESEND_SECONDS);
       Alert.alert('Code Sent', 'A new 6-digit OTP code has been sent to your number.');
     } catch (e) {
       console.error(e);
@@ -98,33 +122,40 @@ export default function OtpScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <OnboardingHeader progress={0.38} />
+      <OnboardingHeader progress={2 / 7} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.headerTextSection}>
-            <Text style={styles.title}>Enter OTP Code</Text>
+            <Text style={styles.title}>Enter your verification code</Text>
             <Text style={styles.description}>
-              We sent a 6-digit code to +91 {phone || 'XXXXX XXXXX'}. Enter it below.
+              We sent a 6-digit code to{' '}
+              <Text style={styles.phoneHighlight}>{dialCode} {phone || 'XXXXX XXXXX'}</Text>.
             </Text>
+            <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} style={styles.editBtn}>
+              <Text style={styles.editPhoneText}>Edit phone number</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* OTP Digit Boxes */}
+          {/* 6 OTP Digit Boxes */}
           <View style={styles.otpGrid}>
             {otp.map((value, index) => (
               <TextInput
                 key={index}
                 ref={inputRefs[index]}
                 keyboardType="number-pad"
-                maxLength={1}
+                maxLength={6}
                 value={value}
                 onChangeText={(text) => handleTextChange(text, index)}
                 onKeyPress={(e) => handleKeyPress(e, index)}
+                onFocus={() => setFocusedIndex(index)}
+                onBlur={() => setFocusedIndex(null)}
                 style={[
                   styles.otpInput,
-                  value ? styles.otpInputActive : styles.otpInputEmpty,
+                  value ? styles.otpInputFilled : styles.otpInputEmpty,
+                  focusedIndex === index && styles.otpInputFocused,
                 ]}
                 selectTextOnFocus
               />
@@ -133,18 +164,28 @@ export default function OtpScreen() {
 
           {/* Resend actions */}
           <View style={styles.resendSection}>
-            <Text style={styles.resendText}>Didn't receive code? </Text>
-            <TouchableOpacity onPress={handleResendCode} disabled={resending} activeOpacity={0.6}>
-              <Text style={styles.resendHighlight}>{resending ? 'Sending...' : 'Resend Code'}</Text>
-            </TouchableOpacity>
+            {secondsLeft > 0 ? (
+              <Text style={styles.resendText}>
+                Resend code in 0:{secondsLeft.toString().padStart(2, '0')}
+              </Text>
+            ) : (
+              <View style={styles.resendRow}>
+                <Text style={styles.resendText}>Didn&apos;t receive the code? </Text>
+                <TouchableOpacity onPress={handleResendCode} disabled={resending} activeOpacity={0.7}>
+                  <Text style={styles.resendHighlight}>{resending ? 'Sending...' : 'Resend'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
+          {/* Primary CTA */}
           <Button
             onPress={handleVerify}
-            title="VERIFY & CONTINUE"
+            title="Verify"
             disabled={!isOtpComplete}
             loading={loading}
-            style={styles.submitBtn}
+            rightIcon={<ArrowRight size={20} color="#FFFFFF" />}
+            style={[styles.submitBtn, isOtpComplete ? styles.activeSubmitBtn : undefined]}
           />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -155,81 +196,115 @@ export default function OtpScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#FFF8FA',
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 30,
+    paddingHorizontal: 24,
+    paddingTop: 28,
     paddingBottom: 40,
-    alignItems: 'center',
   },
   headerTextSection: {
     width: '100%',
-    marginBottom: 32,
+    marginBottom: 28,
   },
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '800',
-    color: Colors.text,
-    marginBottom: 8,
+    color: '#151922',
+    letterSpacing: -0.5,
+    lineHeight: 38,
+    marginBottom: 10,
   },
   description: {
     fontSize: 15,
-    color: Colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: '400',
+    color: '#687080',
     lineHeight: 22,
+    marginBottom: 8,
+  },
+  phoneHighlight: {
+    fontWeight: '600',
+    color: '#151922',
+  },
+  editBtn: {
+    marginTop: 4,
+    alignSelf: 'flex-start',
+  },
+  editPhoneText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#F5537A',
   },
   otpGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
     gap: 8,
-    marginVertical: 10,
+    marginVertical: 12,
   },
   otpInput: {
-    width: '14%',
+    flex: 1,
+    maxWidth: 60,
     aspectRatio: 1,
     borderRadius: 12,
     borderWidth: 1.5,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     textAlign: 'center',
-    color: Colors.text,
+    color: '#151922',
   },
   otpInputEmpty: {
-    backgroundColor: Colors.veryLightPink,
-    borderColor: Colors.lightPink,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#F8DCE5',
   },
-  otpInputActive: {
-    backgroundColor: Colors.white,
-    borderColor: Colors.pink,
-    shadowColor: Colors.pink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+  otpInputFilled: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#F5537A',
+  },
+  otpInputFocused: {
+    backgroundColor: '#FFF7F9',
+    borderColor: '#F5537A',
+    borderWidth: 2,
+    shadowColor: '#F5537A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
   },
   resendSection: {
-    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: 28,
+    marginBottom: 36,
     width: '100%',
+  },
+  resendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   resendText: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: '#687080',
     fontWeight: '500',
   },
   resendHighlight: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.pink,
+    color: '#F5537A',
   },
   submitBtn: {
     width: '100%',
-    marginTop: 40,
+    height: 56,
+    borderRadius: 28,
+  },
+  activeSubmitBtn: {
+    shadowColor: '#F5537A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 6,
   },
 });

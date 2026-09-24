@@ -1,180 +1,355 @@
-import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
-import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
+import { Colors } from '../constants/theme';
+import Avatar from '../components/ui/Avatar';
+import VerifiedBadge from '../components/ui/VerifiedBadge';
+import { Heart, MessageCircle, Share2, Sparkles, Plus, Compass } from 'lucide-react-native';
+import { fetchFeed, fetchStories, likePost, unlikePost, FeedPost, UserStoryGroup } from '../services/social';
 
-import { ExternalLink } from '@/components/external-link';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+export default function SocialDiscoveryScreen() {
+  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [stories, setStories] = useState<UserStoryGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-export default function TabTwoScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
+  const loadSocialData = useCallback(async () => {
+    try {
+      const [feedData, storyData] = await Promise.all([
+        fetchFeed(20),
+        fetchStories(),
+      ]);
+
+      setPosts(feedData.posts);
+      setStories(storyData);
+    } catch (error) {
+      console.error('[Explore] Error loading social data:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    Promise.all([fetchFeed(20), fetchStories()]).then(([feedData, storyData]) => {
+      if (isMounted) {
+        setPosts(feedData.posts);
+        setStories(storyData);
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }).catch((err) => {
+      console.error('[Explore] Error loading social data:', err);
+      if (isMounted) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    });
+    return () => { isMounted = false; };
+  }, []);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadSocialData();
   };
-  const theme = useTheme();
 
-  const contentPlatformStyle = Platform.select({
-    android: {
-      paddingTop: insets.top,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
-      paddingBottom: insets.bottom,
-    },
-    web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
-    },
-  });
+  const handleToggleLike = async (postId: string, currentlyLiked: boolean) => {
+    // Optimistic UI update
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id === postId) {
+          return {
+            ...p,
+            likedByMe: !currentlyLiked,
+            likeCount: currentlyLiked ? p.likeCount - 1 : p.likeCount + 1,
+          };
+        }
+        return p;
+      })
+    );
+
+    if (currentlyLiked) {
+      await unlikePost(postId);
+    } else {
+      await likePost(postId);
+    }
+  };
 
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
-          <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
-          </ThemedText>
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTitleRow}>
+          <Compass size={24} color={Colors.primary} style={{ marginRight: 8 }} />
+          <Text style={styles.headerTitle}>Vibe Discovery</Text>
+        </View>
+        <TouchableOpacity style={styles.createBtn} onPress={() => {}}>
+          <Plus size={20} color="#FFF" />
+          <Text style={styles.createBtnText}>Post</Text>
+        </TouchableOpacity>
+      </View>
 
-          <ExternalLink href="https://docs.expo.dev" asChild>
-            <Pressable style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.linkButton}>
-                <ThemedText type="link">Expo documentation</ThemedText>
-                <SymbolView
-                  tintColor={theme.text}
-                  name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
-                  size={12}
-                />
-              </ThemedView>
-            </Pressable>
-          </ExternalLink>
-        </ThemedView>
+      <ScrollView
+        style={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={Colors.primary} />}
+      >
+        {/* Stories Bar */}
+        <View style={styles.storiesContainer}>
+          <Text style={styles.sectionTitle}>Vibe Stories (24h)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesScroll}>
+            {/* User Create Story Item */}
+            <TouchableOpacity style={styles.storyItem}>
+              <View style={[styles.storyRing, { borderColor: Colors.surface }]}>
+                <Avatar uri="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&h=400&q=80" size={56} />
+                <View style={styles.addStoryPlus}>
+                  <Plus size={12} color="#FFF" />
+                </View>
+              </View>
+              <Text style={styles.storyName} numberOfLines={1}>Your Story</Text>
+            </TouchableOpacity>
 
-        <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
-            <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
-            </ThemedText>
-            <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+            {/* Other User Stories */}
+            {stories.map((group) => (
+              <TouchableOpacity key={group.user.id} style={styles.storyItem}>
+                <View style={[styles.storyRing, { borderColor: group.stories.some((s) => !s.viewedByMe) ? Colors.primary : Colors.textMuted }]}>
+                  <Avatar uri={group.user.avatar} size={56} />
+                </View>
+                <Text style={styles.storyName} numberOfLines={1}>{group.user.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
-              </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
-            </ThemedView>
-          </Collapsible>
+        {/* Feed Posts */}
+        <View style={styles.feedContainer}>
+          <Text style={styles.sectionTitle}>Community Vibe Feed</Text>
 
-          <Collapsible title="Images">
-            <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
-            </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+          {loading ? (
+            <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 40 }} />
+          ) : posts.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Sparkles size={40} color={Colors.textMuted} />
+              <Text style={styles.emptyText}>No posts yet. Be the first to share your vibe!</Text>
+            </View>
+          ) : (
+            posts.map((post) => (
+              <View key={post.id} style={styles.postCard}>
+                {/* Post User Header */}
+                <View style={styles.postHeader}>
+                  <Avatar uri={post.user.avatar} size={44} />
+                  <View style={styles.postUserInfo}>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.postUserName}>{post.user.name}, {post.user.age}</Text>
+                      {post.user.isVerified && <VerifiedBadge size={14} style={{ marginLeft: 4 }} />}
+                    </View>
+                    <Text style={styles.postTime}>
+                      {new Date(post.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                </View>
 
-          <Collapsible title="Light and dark mode components">
-            <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+                {/* Post Caption */}
+                {post.caption && <Text style={styles.postCaption}>{post.caption}</Text>}
 
-          <Collapsible title="Animations">
-            <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
-            </ThemedText>
-          </Collapsible>
-        </ThemedView>
-        {Platform.OS === 'web' && <WebBadge />}
-      </ThemedView>
-    </ScrollView>
+                {/* Post Images */}
+                {post.media && post.media.length > 0 && (
+                  <Image source={{ uri: post.media[0].url }} style={styles.postImage} resizeMode="cover" />
+                )}
+
+                {/* Post Actions */}
+                <View style={styles.postActions}>
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleToggleLike(post.id, post.likedByMe)}>
+                    <Heart size={22} color={post.likedByMe ? Colors.primary : Colors.textMuted} fill={post.likedByMe ? Colors.primary : 'transparent'} />
+                    <Text style={[styles.actionText, post.likedByMe && { color: Colors.primary }]}>
+                      {post.likeCount}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.actionBtn}>
+                    <MessageCircle size={22} color={Colors.textMuted} />
+                    <Text style={styles.actionText}>{post.commentCount}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.actionBtn}>
+                    <Share2 size={22} color={Colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: Colors.text,
+  },
+  createBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  createBtnText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  content: {
     flex: 1,
   },
-  contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  storiesContainer: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
-  container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.text,
+    paddingHorizontal: 20,
+    marginBottom: 12,
   },
-  titleContainer: {
-    gap: Spacing.three,
+  storiesScroll: {
+    paddingHorizontal: 16,
+  },
+  storyItem: {
     alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
+    marginRight: 16,
+    width: 68,
   },
-  centerText: {
+  storyRing: {
+    padding: 2,
+    borderRadius: 34,
+    borderWidth: 2,
+    position: 'relative',
+  },
+  addStoryPlus: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.background,
+  },
+  storyName: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 6,
     textAlign: 'center',
   },
-  pressed: {
-    opacity: 0.7,
+  feedContainer: {
+    paddingVertical: 16,
   },
-  linkButton: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
+  emptyState: {
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.one,
+    paddingVertical: 60,
+  },
+  emptyText: {
+    color: Colors.textMuted,
+    marginTop: 12,
+    fontSize: 14,
+  },
+  postCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  postUserInfo: {
+    marginLeft: 12,
+  },
+  nameRow: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  sectionsWrapper: {
-    gap: Spacing.five,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
+  postUserName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.text,
   },
-  collapsibleContent: {
-    alignItems: 'center',
+  postTime: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 2,
   },
-  imageTutorial: {
+  postCaption: {
+    fontSize: 15,
+    color: Colors.text,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  postImage: {
     width: '100%',
-    aspectRatio: 296 / 171,
-    borderRadius: Spacing.three,
-    marginTop: Spacing.two,
+    height: 250,
+    borderRadius: 12,
+    marginBottom: 12,
   },
-  imageReact: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
+  postActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 24,
+  },
+  actionText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginLeft: 6,
+    fontWeight: '600',
   },
 });

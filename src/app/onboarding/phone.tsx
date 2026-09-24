@@ -1,26 +1,44 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Pressable,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors } from '../../constants/theme';
+import { Phone, Shield, ShieldCheck, ArrowRight } from 'lucide-react-native';
 import Button from '../../components/ui/Button';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
+import CountryPicker, { COUNTRIES, Country } from '../../components/onboarding/CountryPicker';
 import { sendOTP } from '../../services/auth';
+import { useOnboarding } from '../../context/OnboardingContext';
 
 export default function PhoneScreen() {
   const router = useRouter();
+  const onboarding = useOnboarding();
+  const [country, setCountry] = useState<Country>(COUNTRIES[0]);
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
 
-  const isValid = phone.length === 10 && /^\d+$/.test(phone);
+  const phoneInputRef = useRef<TextInput>(null);
+
+  const isValid = phone.length === country.digits && /^\d+$/.test(phone);
 
   const handleSendCode = async () => {
     if (!isValid) return;
     setLoading(true);
     try {
-      await sendOTP(`+91${phone}`);
+      await sendOTP(`${country.dialCode}${phone}`);
+      onboarding.setPhone(phone, country.dialCode);
       router.push({
         pathname: '/onboarding/otp',
-        params: { phone },
+        params: { phone, dialCode: country.dialCode },
       });
     } catch (e) {
       console.error(e);
@@ -30,58 +48,85 @@ export default function PhoneScreen() {
   };
 
   const handlePhoneChange = (text: string) => {
-    // Only allow digits
     const cleaned = text.replace(/[^0-9]/g, '');
-    if (cleaned.length <= 10) {
+    if (cleaned.length <= country.digits) {
       setPhone(cleaned);
     }
   };
 
+  const handleCountryChange = (c: Country) => {
+    setCountry(c);
+    setPhone('');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <OnboardingHeader progress={0.25} />
+      <OnboardingHeader progress={1 / 7} onBackPress={() => router.replace('/login')} />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.headerTextSection}>
-            <Text style={styles.title}>Let's verify your number</Text>
+            <Text style={styles.title}>Let&apos;s verify your number</Text>
             <Text style={styles.description}>
-              We'll send a 6-digit verification code to check if your account is secure.
+              We&apos;ll use your phone number to help keep VibeMatch{' '}
+              <Text style={styles.highlightText}>safe and authentic.</Text>
             </Text>
           </View>
 
           {/* Phone Input Box */}
-          <View style={styles.inputContainer}>
-            <View style={styles.countryCodeContainer}>
-              <Text style={styles.flagText}>🇮🇳</Text>
-              <Text style={styles.codeText}>+91</Text>
-            </View>
+          <Pressable
+            onPress={() => phoneInputRef.current?.focus()}
+            style={[
+              styles.inputContainer,
+              isFocused && styles.inputContainerFocused,
+            ]}
+          >
+            <CountryPicker selected={country} onSelect={handleCountryChange} />
             <View style={styles.divider} />
+            <Phone size={18} color="#F88EA8" style={styles.phoneIcon} />
             <TextInput
+              ref={phoneInputRef}
               placeholder="Enter mobile number"
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor="#A0A6B2"
               keyboardType="number-pad"
-              maxLength={10}
+              maxLength={country.digits}
               value={phone}
               onChangeText={handlePhoneChange}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
               style={styles.textInput}
               autoFocus
+              editable={true}
             />
+          </Pressable>
+
+          {/* Privacy Message */}
+          <View style={styles.privacyContainer}>
+            <Shield size={18} color="#F5537A" style={styles.privacyIcon} />
+            <Text style={styles.privacyText}>
+              Your phone number won&apos;t be shown publicly on your profile.
+            </Text>
           </View>
 
-          <Text style={styles.privacyText}>
-            By continuing, you agree to receive an SMS code for authentication. Message & data rates may apply.
-          </Text>
-
+          {/* CTA Button */}
           <Button
             onPress={handleSendCode}
-            title="SEND CODE"
+            title="Send Code"
             disabled={!isValid}
             loading={loading}
-            style={styles.submitBtn}
+            rightIcon={<ArrowRight size={20} color="#FFFFFF" />}
+            style={[styles.submitBtn, isValid ? styles.activeSubmitBtn : undefined]}
           />
+
+          {/* Bottom Trust Note */}
+          <View style={styles.trustNoteContainer}>
+            <ShieldCheck size={16} color="#F5537A" style={{ marginRight: 6 }} />
+            <Text style={styles.trustNoteText}>
+              We never share your number with anyone.
+            </Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -91,84 +136,118 @@ export default function PhoneScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#FFF8FA',
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 30,
+    paddingHorizontal: 24,
+    paddingTop: 28,
     paddingBottom: 40,
-    alignItems: 'center',
   },
   headerTextSection: {
     width: '100%',
-    marginBottom: 32,
+    marginBottom: 28,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '800',
-    color: Colors.text,
-    marginBottom: 8,
+    color: '#151922',
+    letterSpacing: -0.6,
+    lineHeight: 40,
+    marginBottom: 10,
   },
   description: {
     fontSize: 15,
-    color: Colors.textSecondary,
-    fontWeight: '500',
+    fontWeight: '400',
+    color: '#687080',
     lineHeight: 22,
+  },
+  highlightText: {
+    color: '#F5537A',
+    fontWeight: '600',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    backgroundColor: Colors.veryLightPink,
+    backgroundColor: '#FFF7F9',
     borderWidth: 1.5,
-    borderColor: Colors.lightPink,
-    borderRadius: 16,
-    height: 56,
+    borderColor: '#F8DCE5',
+    borderRadius: 22,
+    height: 64,
     paddingHorizontal: 16,
-    shadowColor: Colors.pink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
+    shadowColor: '#F5537A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  countryCodeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  flagText: {
-    fontSize: 20,
-  },
-  codeText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
+  inputContainerFocused: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#F5537A',
+    borderWidth: 2,
+    shadowColor: '#F5537A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   divider: {
-    width: 1.5,
-    height: 24,
-    backgroundColor: Colors.border,
-    marginHorizontal: 16,
+    width: 1,
+    height: 28,
+    backgroundColor: '#F8DCE5',
+    marginHorizontal: 14,
+  },
+  phoneIcon: {
+    marginRight: 8,
   },
   textInput: {
     flex: 1,
     fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-    height: '100%',
+    fontWeight: '500',
+    color: '#151922',
+    height: 48,
+  },
+  privacyContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 32,
+    paddingHorizontal: 4,
+  },
+  privacyIcon: {
+    marginRight: 10,
   },
   privacyText: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    fontWeight: '500',
+    flex: 1,
+    fontSize: 13,
+    color: '#687080',
+    fontWeight: '400',
     lineHeight: 18,
-    marginTop: 16,
-    width: '100%',
   },
   submitBtn: {
     width: '100%',
-    marginTop: 40,
+    height: 56,
+    borderRadius: 28,
+  },
+  activeSubmitBtn: {
+    shadowColor: '#F5537A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  trustNoteContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  trustNoteText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#687080',
   },
 });

@@ -1,13 +1,13 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../constants/theme';
-import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+import VibeMatchLogo from '../components/ui/VibeMatchLogo';
 
 export default function SplashScreen() {
   const router = useRouter();
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const [scaleAnim] = useState(() => new Animated.Value(1));
+  const [opacityAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     // Fade in text and logo
@@ -43,41 +43,20 @@ export default function SplashScreen() {
       ])
     ).start();
 
-    // Transition timer to login screen
+    // Transition timer to welcome intro screen
     const timer = setTimeout(() => {
-      router.replace('/login');
+      router.replace('/intro' as any);
     }, 2800);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [scaleAnim, opacityAnim, router]);
 
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.content, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
         {/* Heart logo SVG */}
         <View style={styles.logoContainer}>
-          <Svg viewBox="0 0 100 100" width={110} height={110}>
-            <Defs>
-              <SvgGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <Stop offset="0%" stopColor="#A855F7" />
-                <Stop offset="100%" stopColor="#F45F7A" />
-              </SvgGradient>
-            </Defs>
-            {/* Heart pin */}
-            <Path
-              d="M50,90 C30,72 12,50 12,32 C12,16 28,8 50,26 C72,8 88,16 88,32 C88,50 70,72 50,90 Z"
-              stroke="url(#logo-grad)"
-              strokeWidth="6.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-            {/* Heart core */}
-            <Path
-              d="M50,60 C43,53 35,43 35,34 C35,27 40,22 50,30 C60,22 65,27 65,34 C65,43 57,53 50,60 Z"
-              fill="url(#logo-grad)"
-            />
-          </Svg>
+          <VibeMatchLogo size={110} color="#FF2B38" />
         </View>
 
         {/* Brand Text */}

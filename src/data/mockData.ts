@@ -15,6 +15,16 @@ export interface Message {
   };
 }
 
+export type VerificationStatus =
+  | 'not_started'
+  | 'pending'
+  | 'processing'
+  | 'verified'
+  | 'failed'
+  | 'manual_review'
+  | 'expired'
+  | 'cancelled';
+
 export interface User {
   id: string;
   name: string;
@@ -30,9 +40,15 @@ export interface User {
   commentsCount: number;
   hasLiked: boolean;
   messages: Message[];
-  verificationStatus: 'unverified' | 'pending' | 'verified';
+  verificationStatus: VerificationStatus;
   intent?: string;
   isAvailable?: boolean;
+  phoneVerified?: boolean;
+  profileVerified?: boolean;
+  profilePhotos?: string[];
+  connectionIntents?: string[];
+  talkNowAvailable?: boolean;
+  verified?: boolean;
 }
 
 export const ACTIVE_USER = {
@@ -45,124 +61,100 @@ export const ACTIVE_USER = {
   bio: 'Exploring the city & good vibes ☕✨',
   interests: ['Coding', 'Music', 'Coffee', 'Travel'],
   intent: 'Chatting & Fun',
+  connectionIntents: ['Chatting & Fun'] as string[],
   isAvailable: true,
-  verificationStatus: 'verified' as const
+  phoneVerified: false,
+  profileVerified: false,
+  verificationStatus: 'not_started' as VerificationStatus,
+  profilePhotos: [] as string[],
+  talkNowAvailable: false,
+};
+
+export const updateActiveUser = (partial: Partial<typeof ACTIVE_USER>) => {
+  Object.assign(ACTIVE_USER, partial);
 };
 
 export const DEFAULT_USERS: User[] = [
   {
-    id: 'aanya',
-    name: 'Aanya',
-    age: 25,
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&h=200&q=80',
+    id: 'tanya',
+    name: 'Tanya',
+    age: 22,
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&h=400&q=80',
     detailImage: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=600&h=800&q=80',
-    distance: '1.2 km away',
+    distance: '0.8 km away',
     location: 'Koramangala, Bangalore',
     online: true,
-    vibes: ['Gaming', 'Music'],
-    bio: 'Anyone up for coffee? ☕ ',
-    likes: 12,
-    commentsCount: 8,
+    vibes: ['Gaming', 'Music', 'Coffee'],
+    bio: 'Gamer girl & coffee enthusiast 🎮☕ Let\'s talk!',
+    likes: 18,
+    commentsCount: 9,
     hasLiked: false,
     verificationStatus: 'verified',
+    verified: true,
     isAvailable: true,
     messages: [
-      { id: '1', sender: 'them', text: "Hey! How's your day going?", time: '5:21 PM' },
-      { id: '2', sender: 'me', text: 'Pretty good! Just exploring new cafes in the city ☕', time: '5:22 PM' },
-      { id: '3', sender: 'them', text: "Nice! Any hidden gems you'd recommend? ✨", time: '5:23 PM' },
-      { id: '4', sender: 'me', text: "There's this cozy little place in West Village, amazing vibe!", time: '5:24 PM' },
-      { id: '5', sender: 'them', text: 'Sounds perfect! I love cozy places and good conversations.', time: '5:25 PM' },
-      { id: '6', sender: 'me', text: 'We should check it out sometime!', time: '5:26 PM' }
+      { id: '1', sender: 'them', text: 'Hey! I see we both love gaming 🎮 What are you playing right now?', time: '10:30 AM' },
     ]
   },
   {
-    id: 'rohan',
-    name: 'Rohan',
-    age: 26,
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&h=200&q=80',
-    detailImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=600&h=800&q=80',
-    distance: '1.5 km away',
+    id: 'tannu',
+    name: 'Tannu',
+    age: 23,
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&h=400&q=80',
+    detailImage: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&h=800&q=80',
+    distance: '1.2 km away',
     location: 'Indiranagar, Bangalore',
     online: true,
-    vibes: ['Sports', 'Music'],
-    bio: "Bored on a Sunday. Let's talk!",
-    likes: 7,
-    commentsCount: 3,
+    vibes: ['Gaming', 'Hobbies', 'Travel'],
+    bio: 'Always down for deep chats & good vibes ✨',
+    likes: 15,
+    commentsCount: 6,
     hasLiked: false,
     verificationStatus: 'verified',
+    verified: true,
     isAvailable: true,
-    messages: []
+    messages: [
+      { id: '1', sender: 'them', text: 'Hey there! Ready to talk about our favorite vibes? ✨', time: '11:15 AM' }
+    ]
   },
   {
-    id: 'neha',
-    name: 'Neha',
-    age: 24,
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&h=200&q=80',
-    detailImage: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=600&h=800&q=80',
-    distance: '2.1 km away',
+    id: 'sanya',
+    name: 'Sanya',
+    age: 22,
+    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&h=400&q=80',
+    detailImage: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&h=800&q=80',
+    distance: '1.5 km away',
     location: 'HSR Layout, Bangalore',
     online: true,
-    vibes: ['Gaming', 'Travel'],
-    bio: 'Looking for meaningful conversations.',
-    likes: 9,
-    commentsCount: 3,
+    vibes: ['Gaming', 'Movies & Shows', 'Music'],
+    bio: 'Big gaming fan & movie buff 🎬🎮',
+    likes: 21,
+    commentsCount: 11,
     hasLiked: false,
     verificationStatus: 'verified',
+    verified: true,
     isAvailable: true,
-    messages: []
+    messages: [
+      { id: '1', sender: 'them', text: 'Hi! Watched any good movies or played new games lately? 🎮', time: '09:45 AM' }
+    ]
   },
   {
-    id: 'arjun',
-    name: 'Arjun',
-    age: 25,
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&h=200&q=80',
-    detailImage: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=600&h=800&q=80',
-    distance: '2.8 km away',
-    location: 'Koramangala, Bangalore',
+    id: 'ananya',
+    name: 'Ananya',
+    age: 24,
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&h=400&q=80',
+    detailImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=600&h=800&q=80',
+    distance: '2.0 km away',
+    location: 'Jayanagar, Bangalore',
     online: true,
-    vibes: ['Technology', 'Coding'],
-    bio: "Let's talk about ideas that matter.",
-    likes: 11,
+    vibes: ['Gaming', 'Technology', 'Music'],
+    bio: 'Exploring cool cafes and gaming partners! ☕🎮',
+    likes: 14,
     commentsCount: 4,
     hasLiked: false,
     verificationStatus: 'verified',
-    isAvailable: false,
-    messages: []
-  },
-  {
-    id: 'priya',
-    name: 'Priya',
-    age: 24,
-    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=200&h=200&q=80',
-    detailImage: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=600&h=800&q=80',
-    distance: '1.6 km away',
-    location: 'Jayanagar, Bangalore',
-    online: true,
-    vibes: ['Movies & Shows', 'Music'],
-    bio: 'Exploring the city & good vibes ☕',
-    likes: 10,
-    commentsCount: 2,
-    hasLiked: false,
-    verificationStatus: 'verified',
+    verified: true,
     isAvailable: true,
-    messages: []
-  },
-  {
-    id: 'vikram',
-    name: 'Vikram',
-    age: 27,
-    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=200&h=200&q=80',
-    detailImage: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=600&h=800&q=80',
-    distance: '2.0 km away',
-    location: 'Malleswaram, Bangalore',
-    online: false,
-    vibes: ['Hobbies', 'Travel'],
-    bio: 'Always looking for new inspiration.',
-    likes: 14,
-    commentsCount: 5,
-    hasLiked: false,
-    verificationStatus: 'unverified',
-    isAvailable: false,
     messages: []
   }
 ];
@@ -177,3 +169,4 @@ export const getStoredUsers = (): User[] => {
 export const saveStoredUsers = (users: User[]) => {
   currentUsersStore = [...users];
 };
+

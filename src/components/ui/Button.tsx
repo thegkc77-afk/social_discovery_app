@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle, ActivityIndicator, View, StyleProp } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../constants/theme';
 
@@ -9,8 +9,9 @@ interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'outline' | 'text';
   disabled?: boolean;
   loading?: boolean;
-  style?: ViewStyle;
-  textStyle?: TextStyle;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+  rightIcon?: React.ReactNode;
 }
 
 export default function Button({
@@ -21,6 +22,7 @@ export default function Button({
   loading = false,
   style,
   textStyle,
+  rightIcon,
 }: ButtonProps) {
   const isPrimary = variant === 'primary';
   const isSecondary = variant === 'secondary';
@@ -37,18 +39,21 @@ export default function Button({
       return <ActivityIndicator size="small" color={isPrimary ? Colors.white : Colors.pink} />;
     }
     return (
-      <Text
-        style={[
-          styles.text,
-          isPrimary && styles.textPrimary,
-          isSecondary && styles.textSecondary,
-          isOutline && styles.textOutline,
-          disabled && styles.textDisabled,
-          textStyle,
-        ]}
-      >
-        {title}
-      </Text>
+      <View style={styles.contentRow}>
+        <Text
+          style={[
+            styles.text,
+            isPrimary && styles.textPrimary,
+            isSecondary && styles.textSecondary,
+            isOutline && styles.textOutline,
+            disabled && styles.textDisabled,
+            textStyle,
+          ]}
+        >
+          {title}
+        </Text>
+        {rightIcon && <View style={styles.rightIconContainer}>{rightIcon}</View>}
+      </View>
     );
   };
 
@@ -60,7 +65,7 @@ export default function Button({
         style={[styles.container, styles.touchableArea, style]}
       >
         <LinearGradient
-          colors={[Colors.pink, Colors.darkPink]}
+          colors={['#F5537A', '#E11D48']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.gradient}
@@ -92,15 +97,15 @@ export default function Button({
 
 const styles = StyleSheet.create({
   container: {
-    height: 50,
-    borderRadius: 25,
+    height: 54,
+    borderRadius: 27,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
   },
   touchableArea: {
     minWidth: 120,
-    minHeight: 44, // Touch target minimum area
+    minHeight: 44,
   },
   gradient: {
     flex: 1,
@@ -108,7 +113,19 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 25,
+    borderRadius: 27,
+    paddingHorizontal: 24,
+  },
+  contentRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  rightIconContainer: {
+    position: 'absolute',
+    right: 4,
   },
   btnSecondary: {
     backgroundColor: Colors.veryLightPink,
@@ -121,12 +138,12 @@ const styles = StyleSheet.create({
     borderColor: Colors.pink,
   },
   btnDisabled: {
-    backgroundColor: Colors.border,
-    borderColor: Colors.border,
+    backgroundColor: '#FCDAE3',
+    borderColor: '#FCDAE3',
   },
   text: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
   },
   textPrimary: {
@@ -139,6 +156,6 @@ const styles = StyleSheet.create({
     color: Colors.pink,
   },
   textDisabled: {
-    color: Colors.textMuted,
+    color: '#FFFFFF',
   },
 });

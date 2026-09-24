@@ -10,34 +10,57 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Mail, Lock, User } from 'lucide-react-native';
 import { Colors } from '../constants/theme';
 import Button from '../components/ui/Button';
-import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+import VibeMatchLogo from '../components/ui/VibeMatchLogo';
+
+import { registerUser, loginUser } from '../services/auth';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [isSignUp, setIsSignUp] = useState(false);
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const [isSignUp, setIsSignUp] = useState(mode === 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = () => {
-    if (!email || !password || (isSignUp && !name)) {
-      Alert.alert('Error', 'Please fill in all fields');
+  const handleSubmit = async () => {
+    const targetEmail = email.trim();
+    const targetPassword = password.trim();
+    const targetName = name.trim();
+
+    if (!targetEmail) {
+      Alert.alert('Error', 'Please enter your email address');
       return;
     }
-    Alert.alert(
-      isSignUp ? 'Sign Up Success' : 'Login Success',
-      isSignUp ? `Successfully signed up as ${name || email}!` : `Successfully logged in as ${email}!`,
-      [
-        {
-          text: 'Continue',
-          onPress: () => router.replace('/onboarding'),
-        },
-      ]
-    );
+    if (!targetPassword) {
+      Alert.alert('Error', 'Please enter your password');
+      return;
+    }
+    if (isSignUp && !targetName) {
+      Alert.alert('Error', 'Please enter your name');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      if (isSignUp) {
+        await registerUser(targetName, targetEmail, targetPassword, '2000-01-01');
+        Alert.alert('Success', 'Account created successfully!');
+      } else {
+        await loginUser(targetEmail, targetPassword);
+        Alert.alert('Success', 'Logged in successfully!');
+      }
+      router.replace('/onboarding/phone');
+    } catch (error: any) {
+      Alert.alert('Authentication Failed', error?.message || 'Unable to authenticate. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -49,26 +72,7 @@ export default function LoginScreen() {
         {/* Branding header */}
         <View style={styles.brandSection}>
           <View style={styles.logoContainer}>
-            <Svg viewBox="0 0 100 100" width={60} height={60}>
-              <Defs>
-                <SvgGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <Stop offset="0%" stopColor="#A855F7" />
-                  <Stop offset="100%" stopColor="#F45F7A" />
-                </SvgGradient>
-              </Defs>
-              <Path
-                d="M50,90 C30,72 12,50 12,32 C12,16 28,8 50,26 C72,8 88,16 88,32 C88,50 70,72 50,90 Z"
-                stroke="url(#logo-grad)"
-                strokeWidth="6.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-              />
-              <Path
-                d="M50,60 C43,53 35,43 35,34 C35,27 40,22 50,30 C60,22 65,27 65,34 C65,43 57,53 50,60 Z"
-                fill="url(#logo-grad)"
-              />
-            </Svg>
+            <VibeMatchLogo size={60} color="#FF2B38" />
             <View style={styles.logoTextContainer}>
               <Text style={styles.vibeText}>Vibe</Text>
               <Text style={styles.matchText}>Match</Text>
@@ -149,6 +153,7 @@ export default function LoginScreen() {
 
             <Button
               onPress={handleSubmit}
+              loading={loading}
               title={isSignUp ? 'Create Account' : 'Signin to Vibe'}
               style={styles.submitBtn}
             />
@@ -162,10 +167,18 @@ export default function LoginScreen() {
 
             {/* Social Authentication */}
             <View style={styles.socialContainer}>
-              <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={styles.socialButton}
+                activeOpacity={0.7}
+                onPress={() => router.replace('/onboarding/phone')}
+              >
                 <Text style={styles.socialBtnText}>Google</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={styles.socialButton}
+                activeOpacity={0.7}
+                onPress={() => router.replace('/onboarding/phone')}
+              >
                 <Text style={styles.socialBtnText}>Apple</Text>
               </TouchableOpacity>
             </View>

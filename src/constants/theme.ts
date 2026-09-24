@@ -1,37 +1,28 @@
 import { Platform } from 'react-native';
 
 const lightTheme = {
-  background: '#FFF9FA',
-  text: '#242124',
-  textSecondary: '#777174',
-  textMuted: '#A7A0A3',
-  pink: '#F45F7A',
-  darkPink: '#E64D69',
-  lightPink: '#FFE8ED',
-  veryLightPink: '#FFF2F5',
+  background: '#FFF8FA',
+  text: '#151922',
+  textSecondary: '#687080',
+  textMuted: '#A0A7B5',
+  pink: '#F5537A',
+  primary: '#F5537A',
+  secondaryPink: '#FF7FA0',
+  surface: '#FFFFFF',
+  darkPink: '#E43E66',
+  lightPink: '#FFF1F5',
+  veryLightPink: '#FFF8FA',
+  inactiveProgress: '#FCE3EA',
   success: '#35C759',
   successLight: '#E5F9EA',
-  border: '#F2DDE2',
+  border: '#F8DCE5',
   white: '#FFFFFF',
-  backgroundElement: '#FFF2F5',
-  backgroundSelected: '#FFE8ED',
+  backgroundElement: '#FFF1F5',
+  backgroundSelected: '#FFF1F5',
 } as const;
 
 const darkTheme = {
-  background: '#FFF9FA',
-  text: '#242124',
-  textSecondary: '#777174',
-  textMuted: '#A7A0A3',
-  pink: '#F45F7A',
-  darkPink: '#E64D69',
-  lightPink: '#FFE8ED',
-  veryLightPink: '#FFF2F5',
-  success: '#35C759',
-  successLight: '#E5F9EA',
-  border: '#F2DDE2',
-  white: '#FFFFFF',
-  backgroundElement: '#FFF2F5',
-  backgroundSelected: '#FFE8ED',
+  ...lightTheme,
 } as const;
 
 export const Colors = {

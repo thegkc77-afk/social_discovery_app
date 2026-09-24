@@ -1,14 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Pressable, ScrollView, Animated, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, Pressable, ScrollView, Animated, TouchableOpacity, Platform } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../constants/theme';
 import BottomNavBar from '../components/ui/BottomNavBar';
-import { Zap, Bell, Check } from 'lucide-react-native';
+import { Heart, Zap, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+
+import { connectSocket } from '../services/socket';
+import { ensureAuthenticated } from '../services/auth';
+import { joinTalkNow } from '../services/talkNow';
 
 export default function TalkNowScreen() {
   const router = useRouter();
   const [selectedTopic, setSelectedTopic] = useState('Gaming');
+  const [loading, setLoading] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   const topics = [
     { id: 'gaming', label: 'Gaming' },
@@ -23,11 +29,48 @@ export default function TalkNowScreen() {
   ];
 
   // Animated values for pulsing waves
-  const pulse1 = useRef(new Animated.Value(1)).current;
-  const opacity1 = useRef(new Animated.Value(0.6)).current;
-  
-  const pulse2 = useRef(new Animated.Value(1)).current;
-  const opacity2 = useRef(new Animated.Value(0.6)).current;
+  const [pulse1] = useState(() => new Animated.Value(1));
+  const [opacity1] = useState(() => new Animated.Value(0.6));
+
+  const [pulse2] = useState(() => new Animated.Value(1));
+  const [opacity2] = useState(() => new Animated.Value(0.6));
+
+  // Auto-authenticate & listen for socket match events
+  useEffect(() => {
+    let isSubscribed = true;
+
+    const setupAuthAndSocket = async () => {
+      try {
+        await ensureAuthenticated();
+        const socket = await connectSocket();
+
+        if (socket && isSubscribed) {
+          socket.off('talk:matched');
+          socket.on('talk:matched', (matchData: any) => {
+            console.log('[TalkNowScreen] Socket talk:matched received:', matchData);
+            setIsSearching(false);
+            setLoading(false);
+            router.push({
+              pathname: '/match',
+              params: {
+                matchId: matchData.matchId,
+                userId: matchData.userId,
+                topic: matchData.topic || selectedTopic
+              },
+            });
+          });
+        }
+      } catch (err) {
+        console.error('[TalkNowScreen] Error setting up socket:', err);
+      }
+    };
+
+    setupAuthAndSocket();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [router, selectedTopic]);
 
   useEffect(() => {
     // Wave 1 animation
@@ -65,23 +108,64 @@ export default function TalkNowScreen() {
     }, 1000);
 
     return () => clearTimeout(delayTimer);
-  }, []);
+  }, [pulse1, opacity1, pulse2, opacity2]);
 
-  const handleStartTalk = () => {
-    router.push({
-      pathname: '/match',
-      params: { topic: selectedTopic },
-    });
+  const handleStartTalk = async () => {
+    setLoading(true);
+    try {
+      await ensureAuthenticated();
+      await connectSocket();
+
+      // Normalize topic to backend enum (hobby, interest, gaming, general)
+      let backendTopic = selectedTopic.toLowerCase();
+      if (!['hobby', 'interest', 'gaming', 'general'].includes(backendTopic)) {
+        if (backendTopic === 'hobbies') backendTopic = 'hobby';
+        else backendTopic = 'general';
+      }
+
+      const res = await joinTalkNow(backendTopic, 25.5941, 85.1376);
+
+      if (res?.matched) {
+        setLoading(false);
+        router.push({
+          pathname: '/match',
+          params: {
+            matchId: res.match.matchId,
+            userId: res.match.userId,
+            topic: selectedTopic
+          },
+        });
+      } else {
+        // Direct seamless flow to match screen searching animation
+        setTimeout(() => {
+          setLoading(false);
+          router.push({
+            pathname: '/match',
+            params: {
+              topic: selectedTopic
+            },
+          });
+        }, 500);
+      }
+    } catch (error) {
+      console.error('[TalkNow] Error joining Talk Now pool:', error);
+      // Fallback navigation so flow is never broken
+      setLoading(false);
+      router.push({
+        pathname: '/match',
+        params: {
+          topic: selectedTopic
+        },
+      });
+    }
   };
+
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Premium Header */}
       <View style={styles.header}>
         <View style={styles.logoRow}>
-          <View style={styles.logoCircle}>
-            <Zap size={16} color={Colors.white} fill={Colors.white} />
-          </View>
           <View style={styles.logoTextContainer}>
             <Text style={styles.vibeText}>Vibe</Text>
             <Text style={styles.matchText}>Match</Text>
@@ -89,7 +173,7 @@ export default function TalkNowScreen() {
         </View>
 
         <TouchableOpacity style={styles.notificationBtn} activeOpacity={0.7}>
-          <Bell size={20} color={Colors.text} />
+          <Heart size={30} color={Colors.text} />
           <View style={styles.notificationDot} />
         </TouchableOpacity>
       </View>
@@ -118,7 +202,7 @@ export default function TalkNowScreen() {
           />
 
           {/* Main TALK NOW Trigger */}
-          <Pressable onPress={handleStartTalk} style={styles.talkNowBtn}>
+          <Pressable onPress={handleStartTalk} disabled={loading} style={styles.talkNowBtn}>
             <LinearGradient
               colors={[Colors.pink, Colors.darkPink]}
               start={{ x: 0, y: 0 }}
@@ -126,7 +210,9 @@ export default function TalkNowScreen() {
               style={styles.talkNowGradient}
             >
               <Zap size={36} color={Colors.white} fill={Colors.white} />
-              <Text style={styles.talkNowBtnText}>TALK NOW</Text>
+              <Text style={styles.talkNowBtnText}>
+                {loading ? 'Connecting...' : isSearching ? 'Searching...' : "Let's Talk"}
+              </Text>
             </LinearGradient>
           </Pressable>
         </View>
@@ -211,15 +297,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   vibeText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#8B5CF6',
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: -0.6,
+    fontFamily: Platform.select({ web: 'Transcity, sans-serif' }),
   },
   matchText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.pink,
-    fontStyle: 'italic',
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: -0.6,
+    fontFamily: Platform.select({ web: 'Transcity, sans-serif' }),
   },
   notificationBtn: {
     position: 'relative',

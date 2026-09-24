@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, Animated, Platform, TouchableOpacity } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../constants/theme';
@@ -7,28 +7,69 @@ import Avatar from '../components/ui/Avatar';
 import { Sparkles, ArrowLeft } from 'lucide-react-native';
 import { findVibeMatch } from '../services/matching';
 import { User, ACTIVE_USER } from '../data/mockData';
+import VerifiedBadge from '../components/ui/VerifiedBadge';
+
+import { connectSocket, getSocket } from '../services/socket';
 
 export default function MatchScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const topic = (params.topic as string) || 'Gaming';
 
-  const [status, setStatus] = useState<'searching' | 'matched'>('searching');
-  const [matchedUser, setMatchedUser] = useState<User | null>(null);
+  const matchId = (params.matchId as string) || '';
+  const matchedUserIdParam = (params.userId as string) || '';
+
+  const [status, setStatus] = useState<'searching' | 'matched'>(matchId ? 'matched' : 'searching');
+  const [matchedUser, setMatchedUser] = useState<User | null>(() => {
+    if (matchId) {
+      return {
+        id: matchedUserIdParam || 'tanya',
+        name: 'Tanya',
+        age: 22,
+        bio: `Gamer girl matched on ${topic}! 🎮`,
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&h=400&q=80',
+        distance: '0.8 km away',
+        location: 'Patna, India',
+        online: true,
+        vibes: [topic],
+        likes: 15,
+        commentsCount: 4,
+        hasLiked: false,
+        verificationStatus: 'verified',
+        verified: true,
+        messages: []
+      };
+    }
+    return null;
+  });
 
   // Animation values
-  const radarScale1 = useRef(new Animated.Value(0.5)).current;
-  const radarOpacity1 = useRef(new Animated.Value(0.8)).current;
-  const radarScale2 = useRef(new Animated.Value(0.5)).current;
-  const radarOpacity2 = useRef(new Animated.Value(0.8)).current;
+  const [radarScale1] = useState(() => new Animated.Value(0.5));
+  const [radarOpacity1] = useState(() => new Animated.Value(0.8));
+  const [radarScale2] = useState(() => new Animated.Value(0.5));
+  const [radarOpacity2] = useState(() => new Animated.Value(0.8));
 
-  const matchedOpacity = useRef(new Animated.Value(0)).current;
-  const matchedScale = useRef(new Animated.Value(0.9)).current;
+  const [matchedOpacity] = useState(() => new Animated.Value(0));
+  const [matchedScale] = useState(() => new Animated.Value(0.9));
 
   useEffect(() => {
     let animations: Animated.CompositeAnimation[] = [];
 
-    if (status === 'searching') {
+    if (status === 'matched') {
+      Animated.parallel([
+        Animated.timing(matchedOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.spring(matchedScale, {
+          toValue: 1,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
       const a1 = Animated.loop(
         Animated.parallel([
           Animated.timing(radarScale1, {
@@ -65,45 +106,61 @@ export default function MatchScreen() {
       animations = [a1, a2];
       animations.forEach((a) => a.start());
 
-      const searchForVibe = async () => {
+      const setupSocketMatch = async () => {
+        const socket = await connectSocket();
+        if (socket) {
+          socket.on('talk:matched', (data: any) => {
+            if (data?.matchId) {
+              setMatchedUser({
+                id: data.userId || 'partner',
+                name: 'Vibe Match Partner',
+                age: 23,
+                bio: `Matched on ${topic}!`,
+                avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
+                distance: '0.8 km away',
+                location: 'Patna, India',
+                online: true,
+                vibes: [topic],
+                likes: 15,
+                commentsCount: 4,
+                hasLiked: false,
+                verificationStatus: 'verified',
+                verified: true,
+                messages: []
+              });
+              setStatus('matched');
+            }
+          });
+        }
+
         const result = await findVibeMatch('me', topic);
         if (result) {
-          setMatchedUser(result);
-          setStatus('matched');
-        } else {
-          router.back();
+          setTimeout(() => {
+            setMatchedUser(result);
+            setStatus('matched');
+          }, 1200);
         }
       };
 
-      searchForVibe();
-    } else {
-      Animated.parallel([
-        Animated.timing(matchedOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.spring(matchedScale, {
-          toValue: 1,
-          friction: 8,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      setupSocketMatch();
     }
 
     return () => {
       animations.forEach((a) => a.stop());
+      const socket = getSocket();
+      if (socket) {
+        socket.off('match:found');
+        socket.off('talk:matched');
+      }
     };
-  }, [status]);
+  }, [matchId, matchedUserIdParam, status, topic, radarScale1, radarOpacity1, radarScale2, radarOpacity2, matchedOpacity, matchedScale]);
 
   const handleStartChat = () => {
-    if (matchedUser) {
-      router.replace({
-        pathname: `/chats/${matchedUser.id}`,
-        params: { topic },
-      });
-    }
+    const targetId = matchedUser?.id || matchedUserIdParam || 'partner';
+    router.replace({
+      pathname: '/chats/[id]',
+      params: { id: targetId, topic },
+    });
   };
 
   return (
@@ -152,6 +209,15 @@ export default function MatchScreen() {
             <Avatar source={matchedUser?.avatar || ''} size={100} border borderColor={Colors.pink} />
           </View>
 
+          {matchedUser && (
+            <View style={styles.matchedNameRow}>
+              <Text style={styles.matchedNameText}>
+                {matchedUser.name}, {matchedUser.age}
+              </Text>
+              {matchedUser.verificationStatus === 'verified' && <VerifiedBadge size={16} />}
+            </View>
+          )}
+
           {/* Interests Card summary */}
           <View style={styles.interestCard}>
             <Text style={styles.interestCardLabel}>SHARED INTERESTS</Text>
@@ -159,7 +225,7 @@ export default function MatchScreen() {
               You both want to talk about <Text style={styles.highlightText}>{topic}</Text>
             </Text>
             {matchedUser?.bio && (
-              <Text style={styles.matchBio}>"{matchedUser.bio}"</Text>
+              <Text style={styles.matchBio}>&quot;{matchedUser.bio}&quot;</Text>
             )}
           </View>
 
@@ -281,6 +347,17 @@ const styles = StyleSheet.create({
     borderColor: Colors.lightPink,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  matchedNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 16,
+  },
+  matchedNameText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.text,
   },
   interestCard: {
     width: '100%',

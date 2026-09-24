@@ -33,7 +33,7 @@ export default function BottomNavBar() {
       {navItems.map((item) => {
         const Icon = item.icon;
         // Check if the current route matches the tab route
-        const isActive = pathname.startsWith(item.route);
+        const isActive = (pathname || '').startsWith(item.route);
 
         return (
           <Pressable

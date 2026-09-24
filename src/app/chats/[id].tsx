@@ -17,19 +17,24 @@ import { Colors } from '../../constants/theme';
 import Avatar from '../../components/ui/Avatar';
 import Button from '../../components/ui/Button';
 import { ArrowLeft, Send, Plus, MoreVertical, MapPin, Calendar, Clock, X } from 'lucide-react-native';
-import { io } from '../../services/socket';
-import { getStoredUsers, saveStoredUsers, ACTIVE_USER, Message, User } from '../../data/mockData';
-import { saveMeetupInvite } from '../../services/chat';
+import { connectSocket } from '../../services/socket';
+import { getStoredUsers, saveStoredUsers, Message, User } from '../../data/mockData';
+import { fetchConversationMessages, saveMeetupInvite } from '../../services/chat';
+import VerifiedBadge from '../../components/ui/VerifiedBadge';
+
+import { getUserCache } from '../../utils/storage';
 
 export default function ChatRoomScreen() {
   const router = useRouter();
-  const { id, topic } = useLocalSearchParams();
+  const { id, topic, matchId } = useLocalSearchParams();
   const activeTopic = (topic as string) || 'Gaming';
+  const activeMatchId = (matchId as string) || '';
 
   const [users, setUsers] = useState<User[]>(getStoredUsers());
   const [recipient, setRecipient] = useState<User | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputVal, setInputVal] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<string>('');
   
   const socketRef = useRef<any>(null);
   const flatListRef = useRef<FlatList>(null);
@@ -41,16 +46,6 @@ export default function ChatRoomScreen() {
   const [meetTime, setMeetTime] = useState('5:00 PM');
   const [meetNote, setMeetNote] = useState('Looking forward to it! ☕');
 
-  // Load recipient & messages
-  useEffect(() => {
-    const matched = users.find((u) => u.id === id);
-    if (matched) {
-      setRecipient(matched);
-      setMessages(matched.messages);
-    }
-  }, [id, users]);
-
-  // Icebreaker generator based on topic
   const getIcebreaker = (t: string) => {
     switch (t.toLowerCase()) {
       case 'gaming':
@@ -61,11 +56,6 @@ export default function ChatRoomScreen() {
         return 'Hey! I see we are both into traveling ✈️ Where is your next destination?';
       case 'sports':
         return 'Hey! Fellow sports fan ⚽ Did you catch the recent match?';
-      case 'technology':
-      case 'coding':
-        return 'Hey! Always great to meet another developer 💻 What are you building lately?';
-      case 'anime':
-        return 'Hey! I see we are both into anime 🍿 Got any good recommendations?';
       default:
         return `Hey! I noticed we both like ${t} ✨ How did you get into that?`;
     }
@@ -73,56 +63,125 @@ export default function ChatRoomScreen() {
 
   const icebreakerText = getIcebreaker(activeTopic);
 
-  // Connect mock socket
+  // Load recipient & current user profile
   useEffect(() => {
-    const socket = io('http://localhost:5000');
-    socketRef.current = socket;
+    let isMounted = true;
+    const loadProfile = async () => {
+      const cached = await getUserCache();
+      if (!isMounted) return;
+      if (cached?.id) {
+        setCurrentUserId(cached.id);
+      }
 
-    socket.on('message_receive', (data: any) => {
-      if (data.senderId === id) {
-        let text = data.message;
-        let isInvite = false;
-        let inviteDetails = null;
-
-        try {
-          const parsed = JSON.parse(data.message);
-          text = parsed.text;
-          isInvite = parsed.isInvite;
-          inviteDetails = parsed.inviteDetails;
-        } catch {
-          // not JSON
-        }
-
-        const incomingMsg: Message = {
-          id: (Date.now() + Math.random()).toString(),
-          sender: 'them',
-          text,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isInvite,
-          inviteDetails,
+      const matched = users.find((u) => u.id === id);
+      if (matched) {
+        setRecipient(matched);
+        setMessages(matched.messages);
+      } else {
+        const defaultGirl: User = {
+          id: (id as string) || 'tanya',
+          name: 'Tanya',
+          age: 22,
+          bio: `Matched on ${activeTopic}! 🎮`,
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&h=400&q=80',
+          distance: '0.8 km away',
+          location: 'Bangalore, India',
+          online: true,
+          vibes: [activeTopic],
+          likes: 12,
+          commentsCount: 3,
+          hasLiked: false,
+          verificationStatus: 'verified',
+          verified: true,
+          messages: [
+            { id: 'init-1', sender: 'them', text: `Hey! I see we matched on ${activeTopic} 🎮 What are you playing right now?`, time: 'Just now' }
+          ]
         };
-
-        setMessages((prev) => {
-          const updated = [...prev, incomingMsg];
-          setUsers((prevUsers) => {
-            const updatedUsers = prevUsers.map((u) => {
-              if (u.id === id) {
-                return { ...u, messages: updated };
-              }
-              return u;
-            });
-            saveStoredUsers(updatedUsers);
-            return updatedUsers;
-          });
+        setRecipient(defaultGirl);
+        setMessages(defaultGirl.messages);
+        setUsers((prev) => {
+          const updated = [...prev.filter((u) => u.id !== defaultGirl.id), defaultGirl];
+          saveStoredUsers(updated);
           return updated;
         });
       }
-    });
+    };
+    loadProfile();
 
     return () => {
-      socket.disconnect();
+      isMounted = false;
     };
-  }, [id]);
+  }, [id, users, activeTopic]);
+
+  // Connect real Socket & fetch messages
+  useEffect(() => {
+    let isMounted = true;
+
+    const initChatRoom = async () => {
+      const cachedUser = await getUserCache();
+      const myId = cachedUser?.id || '';
+
+      if (activeMatchId) {
+        // 1. Fetch message history from REST API
+        const history = await fetchConversationMessages(activeMatchId);
+        if (isMounted && history.messages.length > 0) {
+          const formatted: Message[] = history.messages.map((m: any) => ({
+            id: m._id || m.id,
+            sender: m.senderId === myId ? 'me' : 'them',
+            text: m.content,
+            time: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          }));
+          setMessages(formatted);
+        }
+      }
+
+      // 2. Connect Socket & join room
+      const socket = await connectSocket();
+      if (socket && isMounted) {
+        socketRef.current = socket;
+
+        if (activeMatchId) {
+          socket.emit('chat:join', { matchId: activeMatchId });
+        }
+
+        socket.off('chat:receive_message');
+        socket.on('chat:receive_message', (data: any) => {
+          if (isMounted) {
+            const isSelf = data.senderId === myId || (currentUserId && data.senderId === currentUserId);
+            const newMsg: Message = {
+              id: data._id || data.id || `msg-${Date.now()}`,
+              sender: isSelf ? 'me' : 'them',
+              text: data.content,
+              time: new Date(data.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            };
+
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id || (m.text === newMsg.text && m.sender === newMsg.sender))) {
+                return prev;
+              }
+              const updated = [...prev, newMsg];
+              // Persist to stored users
+              setUsers((prevUsers) => {
+                const uList = prevUsers.map((u) => (u.id === id ? { ...u, messages: updated } : u));
+                saveStoredUsers(uList);
+                return uList;
+              });
+              return updated;
+            });
+          }
+        });
+      }
+    };
+
+    initChatRoom();
+
+    return () => {
+      isMounted = false;
+      if (socketRef.current) {
+        socketRef.current.off('chat:receive_message');
+      }
+    };
+  }, [activeMatchId, currentUserId, id]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -131,35 +190,36 @@ export default function ChatRoomScreen() {
   }, [messages]);
 
   const handleSendMessage = async (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() || !id) return;
 
+    const trimmedText = text.trim();
+    const clientMessageId = `msg-${Date.now()}-${Math.random()}`;
+
+    // Optimistically update UI
     const localMsg: Message = {
-      id: Date.now().toString(),
+      id: clientMessageId,
       sender: 'me',
-      text: text.trim(),
+      text: trimmedText,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    const updated = [...messages, localMsg];
-    setMessages(updated);
+    setMessages((prev) => {
+      const updated = [...prev, localMsg];
+      setUsers((prevUsers) => {
+        const uList = prevUsers.map((u) => (u.id === id ? { ...u, messages: updated } : u));
+        saveStoredUsers(uList);
+        return uList;
+      });
+      return updated;
+    });
     setInputVal('');
 
-    setUsers((prevUsers) => {
-      const updatedUsers = prevUsers.map((u) => {
-        if (u.id === id) {
-          return { ...u, messages: updated };
-        }
-        return u;
-      });
-      saveStoredUsers(updatedUsers);
-      return updatedUsers;
-    });
-
-    if (socketRef.current) {
-      socketRef.current.emit('message_send', {
-        senderId: 'me',
+    // Emit chat:send_message socket event to backend
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('chat:send_message', {
+        matchId: activeMatchId,
         receiverId: id,
-        message: JSON.stringify({ text: text.trim(), isInvite: false }),
+        content: trimmedText,
       });
     }
   };
@@ -167,38 +227,21 @@ export default function ChatRoomScreen() {
   const handleSendInvite = async () => {
     setMeetModalVisible(false);
     
-    const inviteMsg = await saveMeetupInvite('me', id as string, {
+    await saveMeetupInvite(activeMatchId || 'me', (id as string) || 'partner', {
       place: meetPlace,
       date: meetDate,
       time: meetTime,
       note: meetNote,
     });
 
-    const updated = [...messages, inviteMsg];
-    setMessages(updated);
+    const localInviteMsg: Message = {
+      id: `invite-${Date.now()}`,
+      sender: 'me',
+      text: `📍 Meetup Invite: ${meetPlace} on ${meetDate} at ${meetTime}`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
 
-    setUsers((prevUsers) => {
-      const updatedUsers = prevUsers.map((u) => {
-        if (u.id === id) {
-          return { ...u, messages: updated };
-        }
-        return u;
-      });
-      saveStoredUsers(updatedUsers);
-      return updatedUsers;
-    });
-
-    if (socketRef.current) {
-      socketRef.current.emit('message_send', {
-        senderId: 'me',
-        receiverId: id,
-        message: JSON.stringify({
-          text: inviteMsg.text,
-          isInvite: true,
-          inviteDetails: inviteMsg.inviteDetails,
-        }),
-      });
-    }
+    setMessages((prev) => [...prev, localInviteMsg]);
   };
 
   const handleAcceptInvite = (msgId: string) => {
@@ -277,7 +320,7 @@ export default function ChatRoomScreen() {
               <Text style={styles.inviteDetailText}>{details.date} at {details.time}</Text>
             </View>
             {details.note ? (
-              <Text style={styles.inviteNote}>"{details.note}"</Text>
+              <Text style={styles.inviteNote}>&quot;{details.note}&quot;</Text>
             ) : null}
 
             {details.status === 'pending' ? (
@@ -342,7 +385,10 @@ export default function ChatRoomScreen() {
           <View style={styles.headerInfo}>
             <Avatar source={recipient.avatar} size={40} showOnlineStatus online={recipient.online} />
             <View style={styles.headerNameWrapper}>
-              <Text style={styles.headerName}>{recipient.name}</Text>
+              <View style={styles.headerNameRow}>
+                <Text style={styles.headerName}>{recipient.name}</Text>
+                {recipient.verificationStatus === 'verified' && <VerifiedBadge size={13} />}
+              </View>
               <Text style={styles.headerStatus}>
                 {recipient.online ? 'Online now' : 'Offline'}
               </Text>
@@ -529,6 +575,11 @@ const styles = StyleSheet.create({
   },
   headerNameWrapper: {
     justifyContent: 'center',
+  },
+  headerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
   headerName: {
     fontSize: 16,

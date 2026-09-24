@@ -6,10 +6,22 @@ import { Plus, X } from 'lucide-react-native';
 import { Colors } from '../../constants/theme';
 import Button from '../../components/ui/Button';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
+import { useOnboarding } from '../../context/OnboardingContext';
+import { saveUserPhotos } from '../../services/users';
+
+const PHOTO_TIPS = [
+  'Use a clear photo of yourself',
+  'Make sure your face is visible',
+  'Avoid heavily edited photos',
+  'Avoid group photos as your first photo',
+  'Use recent photos',
+];
 
 export default function PhotosScreen() {
   const router = useRouter();
+  const onboarding = useOnboarding();
   const [images, setImages] = useState<(string | null)[]>([null, null, null, null, null, null]);
+  const [, setLoading] = useState(false);
 
   const addedCount = images.filter((img) => img !== null).length;
   const isValid = addedCount >= 4;
@@ -52,9 +64,19 @@ export default function PhotosScreen() {
     setImages(padded);
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!isValid) return;
-    router.push('/onboarding/verification');
+    setLoading(true);
+    try {
+      const validPhotos = images.filter((img): img is string => img !== null);
+      onboarding.setPhotos(validPhotos);
+      await saveUserPhotos(validPhotos);
+      router.push('/onboarding/interests');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const slotWidth = (Dimensions.get('window').width - 56) / 2; // (Screen width - horizontal paddings - gap) / 2
@@ -62,12 +84,12 @@ export default function PhotosScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <OnboardingHeader progress={0.62} />
+      <OnboardingHeader progress={4 / 7} />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.headerTextSection}>
-          <Text style={styles.title}>Upload your photos</Text>
+          <Text style={styles.title}>Add your photos</Text>
           <Text style={styles.description}>
-            Upload at least 4 photos to continue. The first photo is your cover.
+            Add at least 4 photos so people know who they&apos;re talking to.
           </Text>
         </View>
 
@@ -75,9 +97,9 @@ export default function PhotosScreen() {
         <View style={styles.progressLabelContainer}>
           <Text style={styles.progressLabelText}>
             {addedCount >= 4 ? (
-              <Text style={styles.successText}>✓ {addedCount} of 6 photos added</Text>
+              <Text style={styles.successText}>{addedCount} photos added ✓</Text>
             ) : (
-              <Text style={styles.progressText}>{addedCount} of 4 photos added (minimum 4)</Text>
+              <Text style={styles.progressText}>{addedCount} of 4 photos added</Text>
             )}
           </Text>
         </View>
@@ -124,6 +146,17 @@ export default function PhotosScreen() {
               </View>
             );
           })}
+        </View>
+
+        {/* Photo tips */}
+        <View style={styles.tipsCard}>
+          <Text style={styles.tipsTitle}>Photo tips</Text>
+          {PHOTO_TIPS.map((tip) => (
+            <View key={tip} style={styles.tipRow}>
+              <Text style={styles.tipCheck}>✓</Text>
+              <Text style={styles.tipText}>{tip}</Text>
+            </View>
+          ))}
         </View>
 
         <Button
@@ -268,5 +301,38 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     width: '100%',
+  },
+  tipsCard: {
+    width: '100%',
+    backgroundColor: Colors.veryLightPink,
+    borderWidth: 1,
+    borderColor: Colors.lightPink,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+  },
+  tipsTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 10,
+  },
+  tipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 6,
+  },
+  tipCheck: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: Colors.success,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
+    color: Colors.textSecondary,
+    lineHeight: 18,
   },
 });

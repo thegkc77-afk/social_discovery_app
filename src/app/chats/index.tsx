@@ -1,29 +1,53 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, Pressable, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/theme';
 import BottomNavBar from '../../components/ui/BottomNavBar';
 import Avatar from '../../components/ui/Avatar';
 import { Search, MessageSquare } from 'lucide-react-native';
-import { getStoredUsers, User } from '../../data/mockData';
+import { fetchConversations, ChatConversation } from '../../services/chat';
+import { ensureAuthenticated } from '../../services/auth';
 
 export default function ChatsIndexScreen() {
   const router = useRouter();
-  const [users, setUsers] = useState<User[]>(getStoredUsers());
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Active chats are users that have message history
-  const activeChats = users.filter((u) => u.messages.length > 0);
+  useEffect(() => {
+    let isMounted = true;
+    const loadConversations = async () => {
+      try {
+        await ensureAuthenticated();
+        const data = await fetchConversations();
+        if (isMounted) {
+          setConversations(data);
+        }
+      } catch (error) {
+        console.error('[ChatsIndex] Error loading conversations:', error);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
 
-  const filteredChats = activeChats.filter((chat) =>
-    chat.name.toLowerCase().includes(searchQuery.toLowerCase())
+    loadConversations();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const filteredConversations = conversations.filter((c) =>
+    c.otherUser?.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderChatItem = ({ item }: { item: User }) => {
-    const lastMsg = item.messages[item.messages.length - 1];
-    
-    // Check for mock unread count (e.g. Aanya has 1 unread)
-    const hasUnread = item.id === 'aanya';
+  const formatTime = (isoString?: string) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const renderChatItem = ({ item }: { item: ChatConversation }) => {
+    const user = item.otherUser;
 
     return (
       <Pressable
@@ -31,30 +55,22 @@ export default function ChatsIndexScreen() {
         style={({ pressed }) => [styles.chatRow, pressed && styles.chatRowPressed]}
       >
         <Avatar
-          source={item.avatar}
+          source={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&h=200&q=80'}
           size={56}
           showOnlineStatus
-          online={item.online}
+          online={true}
         />
         <View style={styles.chatDetails}>
           <View style={styles.chatHeaderRow}>
-            <Text style={styles.chatName}>{item.name}</Text>
-            <Text style={[styles.chatTime, hasUnread && styles.unreadChatTime]}>
-              {lastMsg?.time || '5:00 PM'}
+            <Text style={styles.chatName}>{user?.name || 'VibeMatch User'}</Text>
+            <Text style={styles.chatTime}>
+              {formatTime((typeof item.lastMessage === 'object' ? item.lastMessage?.createdAt : item.lastMessageTime) || item.updatedAt)}
             </Text>
           </View>
           <View style={styles.chatMsgRow}>
-            <Text
-              style={[styles.chatMsgText, hasUnread && styles.unreadChatMsgText]}
-              numberOfLines={1}
-            >
-              {lastMsg?.text || 'No messages yet'}
+            <Text style={styles.chatMsgText} numberOfLines={1}>
+              {(typeof item.lastMessage === 'object' ? item.lastMessage?.content : item.lastMessage) || 'Say hello to start the conversation! 👋'}
             </Text>
-            {hasUnread && (
-              <View style={styles.unreadBadge}>
-                <Text style={styles.unreadText}>1</Text>
-              </View>
-            )}
           </View>
         </View>
       </Pressable>
@@ -72,7 +88,7 @@ export default function ChatsIndexScreen() {
       </View>
 
       {/* Search Bar */}
-      {activeChats.length > 0 && (
+      {conversations.length > 0 && (
         <View style={styles.searchSection}>
           <Search size={18} color={Colors.textSecondary} style={styles.searchIcon} />
           <TextInput
@@ -85,10 +101,14 @@ export default function ChatsIndexScreen() {
         </View>
       )}
 
-      {/* Chat List or Empty State */}
-      {filteredChats.length > 0 ? (
+      {/* Loading State */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.pink} />
+        </View>
+      ) : filteredConversations.length > 0 ? (
         <FlatList
-          data={filteredChats}
+          data={filteredConversations}
           keyExtractor={(item) => item.id}
           renderItem={renderChatItem}
           contentContainerStyle={styles.listContent}
@@ -100,7 +120,7 @@ export default function ChatsIndexScreen() {
           </View>
           <Text style={styles.emptyTitle}>No active chats</Text>
           <Text style={styles.emptyDescription}>
-            Start a "Talk Now" session and find someone who matches your vibe to start talking.
+            Start a &quot;Talk Now&quot; session or match on Discovery to start talking.
           </Text>
         </View>
       )}
@@ -158,8 +178,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     height: '100%',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   listContent: {
-    paddingBottom: 100, // Safe padding for BottomNavBar
+    paddingBottom: 100,
   },
   chatRow: {
     flexDirection: 'row',
@@ -193,10 +218,6 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     fontWeight: '500',
   },
-  unreadChatTime: {
-    color: Colors.pink,
-    fontWeight: '700',
-  },
   chatMsgRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -208,24 +229,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     flex: 1,
     marginRight: 8,
-  },
-  unreadChatMsgText: {
-    color: Colors.text,
-    fontWeight: '700',
-  },
-  unreadBadge: {
-    backgroundColor: Colors.pink,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  unreadText: {
-    color: Colors.white,
-    fontSize: 10,
-    fontWeight: '800',
   },
   emptyContainer: {
     flex: 1,
