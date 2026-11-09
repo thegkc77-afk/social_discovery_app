@@ -1,5 +1,5 @@
 import { API_BASE_URL } from '../config/api';
-import { getAccessToken } from '../utils/storage';
+import { getAccessToken, getUserCache, saveUserCache } from '../utils/storage';
 import { User, ACTIVE_USER, updateActiveUser } from '../data/mockData';
 
 export const fetchUserProfile = async (userId?: string): Promise<User | null> => {

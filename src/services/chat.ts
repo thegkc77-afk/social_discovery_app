@@ -130,3 +130,30 @@ export const blockMatchParticipant = async (matchId: string) => {
     return { success: false };
   }
 };
+
+export interface MeetupInviteDetails {
+  place: string;
+  date: string;
+  time: string;
+  note?: string;
+}
+
+export const saveMeetupInvite = async (matchId: string, recipientId: string, invite: MeetupInviteDetails) => {
+  try {
+    const token = await getAccessToken();
+    if (!token) return { success: false };
+    const res = await fetch(`${API_BASE_URL}/matches/${matchId}/invite`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ recipientId, ...invite })
+    });
+    return await res.json();
+  } catch (error) {
+    console.error('[ChatService] saveMeetupInvite error:', error);
+    return { success: false };
+  }
+};
+

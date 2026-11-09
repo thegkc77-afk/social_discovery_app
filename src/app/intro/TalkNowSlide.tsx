@@ -129,7 +129,7 @@ export function TalkNowArt() {
           <Chip
             icon={<Sparkles size={16} color={selectedTopic === 'Hobbies' ? '#FFFFFF' : '#F5537A'} />}
             label="Hobbies"
-            style={[{ marginLeft: 14 }, selectedTopic === 'Hobbies' ? { backgroundColor: '#F5537A' } : undefined]}
+            style={{ marginLeft: 14, backgroundColor: selectedTopic === 'Hobbies' ? '#F5537A' : undefined }}
           />
         </TouchableOpacity>
       </View>

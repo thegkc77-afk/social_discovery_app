@@ -1,7 +1,7 @@
 import { API_BASE_URL } from '../config/api';
 import { getAccessToken } from '../utils/storage';
 
-export const joinTalkNow = async (topic: string) => {
+export const joinTalkNow = async (topic: string, lat?: number, lng?: number) => {
   try {
     const token = await getAccessToken();
     const res = await fetch(`${API_BASE_URL}/talk-now/join`, {
@@ -11,7 +11,9 @@ export const joinTalkNow = async (topic: string) => {
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
-        topic: topic || 'General'
+        topic: topic || 'General',
+        lat,
+        lng
       })
     });
     const data = await res.json();
