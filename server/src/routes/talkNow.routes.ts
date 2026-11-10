@@ -19,6 +19,8 @@ router.post('/join', authMiddleware, (req: AuthenticatedRequest, res: Response) 
   if (matchResult) {
     const candidate = matchResult.candidate;
     const match = db.createMatch(userId, candidate.id, sanitizedTopic);
+    const userProfile = db.findUserById(userId);
+    const candidateProfile = db.findUserById(candidate.id);
 
     if (matchResult.candidateSessionId) {
       sqlite
@@ -29,12 +31,16 @@ router.post('/join', authMiddleware, (req: AuthenticatedRequest, res: Response) 
     notifyTalkMatch(candidate.id, {
       matchId: match.id,
       userId: req.user.id,
+      name: userProfile?.name || 'Vibe Partner',
+      avatar: userProfile?.photos?.[0] || userProfile?.avatar || '',
       topic: sanitizedTopic,
     });
 
     notifyTalkMatch(userId, {
       matchId: match.id,
       userId: candidate.id,
+      name: candidateProfile?.name || 'Vibe Partner',
+      avatar: candidateProfile?.photos?.[0] || candidateProfile?.avatar || '',
       topic: sanitizedTopic,
     });
 
@@ -44,6 +50,8 @@ router.post('/join', authMiddleware, (req: AuthenticatedRequest, res: Response) 
       match: {
         matchId: match.id,
         userId: candidate.id,
+        name: candidateProfile?.name || 'Vibe Partner',
+        avatar: candidateProfile?.photos?.[0] || candidateProfile?.avatar || '',
         topic: sanitizedTopic,
       },
     });

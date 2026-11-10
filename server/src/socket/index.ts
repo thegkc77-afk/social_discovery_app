@@ -6,20 +6,29 @@ import { db } from '../db/store.js';
 let ioInstance: SocketIOServer | null = null;
 const userSockets = new Map<string, string[]>();
 
-export function initSocketIO(server: HTTPServer, corsOrigin: string) {
+export function initSocketIO(server: HTTPServer, _corsOrigin: string) {
   ioInstance = new SocketIOServer(server, {
     cors: {
-      origin: corsOrigin === '*' ? true : corsOrigin,
+      origin: (_origin, callback) => callback(null, true),
+      credentials: true,
       methods: ['GET', 'POST'],
     },
+    transports: ['polling', 'websocket'],
+    allowEIO3: true,
   });
 
   ioInstance.use((socket: Socket, next) => {
     const token = socket.handshake.auth?.token;
-    if (!token) return next(new Error('Authentication token required'));
+    if (!token) {
+      console.warn('[Socket] Connection rejected: No token provided');
+      return next(new Error('Authentication token required'));
+    }
 
     const user = verifySocketToken(token);
-    if (!user) return next(new Error('Invalid token'));
+    if (!user) {
+      console.warn('[Socket] Connection rejected: Invalid or expired token');
+      return next(new Error('Invalid token'));
+    }
 
     (socket as any).user = user;
     next();
@@ -79,11 +88,13 @@ export function initSocketIO(server: HTTPServer, corsOrigin: string) {
   return ioInstance;
 }
 
-export function notifyTalkMatch(userId: string, matchData: { matchId: string; userId: string; topic: string }) {
+export function notifyTalkMatch(
+  userId: string,
+  matchData: { matchId: string; userId: string; topic: string; name?: string; avatar?: string }
+) {
   if (!ioInstance) return;
   const sockets = userSockets.get(userId) || [];
   sockets.forEach((sId) => {
     ioInstance?.to(sId).emit('talk:matched', matchData);
   });
 }
-

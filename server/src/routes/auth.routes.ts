@@ -61,13 +61,13 @@ router.post('/otp/verify', async (req, res: Response) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash('SecureOtpUserPass123', salt);
     const now = new Date().toISOString();
-    user = db.createUser({
+    user = await db.createUser({
       id: uuidv4(),
       name: `Vibe_${cleanPhone.slice(-4)}`,
       phone: cleanPhone,
       passwordHash,
       dateOfBirth: '2000-01-01',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&h=400&q=80',
+      avatar: '',
       photos: [],
       interests: [],
       intents: [],
@@ -122,7 +122,7 @@ router.post('/signup', async (req, res: Response) => {
       occupation: '',
       education: '',
       relationshipGoal: '',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&h=400&q=80',
+      avatar: '',
       photos: [],
       interests: [],
       intents: [],
@@ -132,7 +132,7 @@ router.post('/signup', async (req, res: Response) => {
       updatedAt: now,
     };
 
-    db.createUser(newUser);
+    await db.createUser(newUser);
     const token = generateToken(newUser.id);
 
     return res.status(201).json({

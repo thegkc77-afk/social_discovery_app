@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { sqlite } from './sqlite.js';
+import { supabase, isSupabaseConfigured } from './supabase.js';
 
 export interface User {
   id: string;
@@ -119,121 +120,6 @@ function calculateAge(dob?: string | null): number {
 }
 
 class DatabaseStore {
-  constructor() {
-    this.seedIfEmpty();
-  }
-
-  private seedIfEmpty() {
-    const row = sqlite.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number };
-    if (row && row.count > 0) return;
-
-    const seedUsers = [
-      {
-        id: 'tanya',
-        name: 'Tanya',
-        email: 'tanya@vibematch.local',
-        phone: '+919876543210',
-        passwordHash: '$2a$10$WqBfq7E942N6j9BvL5x6vef9cZ4Yv4mC8nZ/7q6V2K5N5hW3qM02y',
-        dateOfBirth: '2002-04-12',
-        gender: 'Woman',
-        bio: "Gamer girl & coffee enthusiast 🎮☕ Let's talk!",
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&h=400&q=80',
-        photos: [
-          'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&h=400&q=80',
-          'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&h=400&q=80',
-        ],
-        interests: ['Gaming', 'Music', 'Traveling'],
-        intents: ['Dating', 'Friendship'],
-        location: { name: 'Koramangala, Bangalore', latitude: 12.9352, longitude: 77.6245 },
-      },
-      {
-        id: 'tannu',
-        name: 'Tannu',
-        email: 'tannu@vibematch.local',
-        phone: '+919876543211',
-        passwordHash: '$2a$10$WqBfq7E942N6j9BvL5x6vef9cZ4Yv4mC8nZ/7q6V2K5N5hW3qM02y',
-        dateOfBirth: '2001-08-20',
-        gender: 'Woman',
-        bio: 'Music lover & weekend explorer 🎧✨ Looking for good vibes.',
-        avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&h=400&q=80',
-        photos: [
-          'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&h=400&q=80',
-        ],
-        interests: ['Music', 'Traveling', 'Photography'],
-        intents: ['Dating', 'Friendship'],
-        location: { name: 'Indiranagar, Bangalore', latitude: 12.9784, longitude: 77.6408 },
-      },
-      {
-        id: 'sanya',
-        name: 'Sanya',
-        email: 'sanya@vibematch.local',
-        phone: '+919876543212',
-        passwordHash: '$2a$10$WqBfq7E942N6j9BvL5x6vef9cZ4Yv4mC8nZ/7q6V2K5N5hW3qM02y',
-        dateOfBirth: '2003-02-15',
-        gender: 'Woman',
-        bio: 'Book lover, design nerd & sunset chaser 📚🌅',
-        avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&h=400&q=80',
-        photos: [
-          'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&h=400&q=80',
-        ],
-        interests: ['Books', 'Photography', 'Movies'],
-        intents: ['Friendship', 'Just Talking'],
-        location: { name: 'HSR Layout, Bangalore', latitude: 12.9116, longitude: 77.6389 },
-      },
-      {
-        id: 'ananya',
-        name: 'Ananya',
-        email: 'ananya@vibematch.local',
-        phone: '+919876543213',
-        passwordHash: '$2a$10$WqBfq7E942N6j9BvL5x6vef9cZ4Yv4mC8nZ/7q6V2K5N5hW3qM02y',
-        dateOfBirth: '2000-11-05',
-        gender: 'Woman',
-        bio: 'Fitness fanatic & tech dreamer 🏋️‍♀️💻 Always down for a chat!',
-        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&h=400&q=80',
-        photos: [
-          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&h=400&q=80',
-        ],
-        interests: ['Gym & Fitness', 'Gaming', 'Traveling'],
-        intents: ['Dating', 'Friendship'],
-        location: { name: 'Koramangala, Bangalore', latitude: 12.9345, longitude: 77.619 },
-      },
-    ];
-
-    const now = new Date().toISOString();
-    for (const u of seedUsers) {
-      this.createUser({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        phone: u.phone,
-        passwordHash: u.passwordHash,
-        dateOfBirth: u.dateOfBirth,
-        gender: u.gender,
-        bio: u.bio,
-        occupation: '',
-        education: '',
-        relationshipGoal: '',
-        avatar: u.avatar,
-        photos: u.photos,
-        interests: u.interests,
-        intents: u.intents,
-        isVerified: true,
-        accountStatus: 'active',
-        location: {
-          name: u.location.name,
-          latitude: u.location.latitude,
-          longitude: u.location.longitude,
-          updatedAt: now,
-        },
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      this.createPost(u.id, `Loving the vibe today! ✨ #${u.interests[0] || 'vibematch'}`, u.photos[0] || u.avatar);
-      this.createStory(u.id, u.photos[0] || u.avatar);
-    }
-  }
-
   public getInterests() {
     return DEFAULT_INTERESTS;
   }
@@ -248,11 +134,8 @@ class DatabaseStore {
     const expiresAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
 
     sqlite.prepare('DELETE FROM otps WHERE phone = ?').run(phone);
-
     sqlite
-      .prepare(
-        'INSERT INTO otps (id, phone, otp, expires_at, verified, created_at) VALUES (?, ?, ?, ?, 0, ?)'
-      )
+      .prepare('INSERT INTO otps (id, phone, otp, expires_at, verified, created_at) VALUES (?, ?, ?, ?, 0, ?)')
       .run(id, phone, otp, expiresAt, now.toISOString());
 
     return { id, expiresAt };
@@ -260,9 +143,7 @@ class DatabaseStore {
 
   public verifyOtp(phone: string, inputOtp: string): boolean {
     const row = sqlite
-      .prepare(
-        'SELECT * FROM otps WHERE phone = ? AND otp = ? AND verified = 0 ORDER BY created_at DESC LIMIT 1'
-      )
+      .prepare('SELECT * FROM otps WHERE phone = ? AND otp = ? AND verified = 0 ORDER BY created_at DESC LIMIT 1')
       .get(phone, inputOtp) as any;
 
     if (!row) return false;
@@ -275,7 +156,7 @@ class DatabaseStore {
     return true;
   }
 
-  public createUser(user: User): User {
+  public async createUser(user: User): Promise<User> {
     const stmt = sqlite.prepare(`
       INSERT INTO users (
         id, name, email, phone, password_hash, date_of_birth, gender, bio,
@@ -314,6 +195,26 @@ class DatabaseStore {
     }
     if (user.location) {
       this.setUserLocation(user.id, user.location.name, user.location.latitude, user.location.longitude);
+    }
+
+    if (isSupabaseConfigured() && supabase) {
+      try {
+        await supabase.from('profiles').upsert({
+          id: user.id,
+          display_name: user.name,
+          date_of_birth: user.dateOfBirth || '2000-01-01',
+          gender: user.gender,
+          bio: user.bio,
+          occupation: user.occupation,
+          education: user.education,
+          relationship_goal: user.relationshipGoal,
+          avatar_path: user.avatar,
+          account_status: user.accountStatus,
+          onboarding_completed: user.isVerified,
+        });
+      } catch (e) {
+        console.warn('[Supabase Sync Warning]', e);
+      }
     }
 
     return user;
@@ -429,6 +330,25 @@ class DatabaseStore {
       this.setUserLocation(id, updates.location.name, updates.location.latitude, updates.location.longitude);
     }
 
+    if (isSupabaseConfigured() && supabase) {
+      supabase
+        .from('profiles')
+        .update({
+          display_name: updated.name,
+          date_of_birth: updated.dateOfBirth,
+          gender: updated.gender,
+          bio: updated.bio,
+          occupation: updated.occupation,
+          education: updated.education,
+          relationship_goal: updated.relationshipGoal,
+          avatar_path: updated.avatar,
+          onboarding_completed: updated.isVerified,
+          updated_at: updated.updatedAt,
+        })
+        .eq('id', id)
+        .then(() => {});
+    }
+
     return this.findUserById(id) || null;
   }
 
@@ -444,6 +364,18 @@ class DatabaseStore {
 
     if (photoUrls.length > 0) {
       sqlite.prepare('UPDATE users SET avatar = ? WHERE id = ?').run(photoUrls[0], userId);
+    }
+
+    if (isSupabaseConfigured() && supabase) {
+      supabase.from('profile_photos').delete().eq('user_id', userId).then(() => {
+        const records = photoUrls.map((url, idx) => ({
+          user_id: userId,
+          storage_path: url,
+          display_order: idx,
+          is_primary: idx === 0,
+        }));
+        if (records.length > 0 && supabase) supabase.from('profile_photos').insert(records);
+      });
     }
   }
 
@@ -467,9 +399,7 @@ class DatabaseStore {
     const now = new Date().toISOString();
     sqlite.prepare('DELETE FROM user_locations WHERE user_id = ?').run(userId);
     sqlite
-      .prepare(
-        'INSERT INTO user_locations (user_id, name, latitude, longitude, updated_at) VALUES (?, ?, ?, ?, ?)'
-      )
+      .prepare('INSERT INTO user_locations (user_id, name, latitude, longitude, updated_at) VALUES (?, ?, ?, ?, ?)')
       .run(userId, name, lat || null, lng || null, now);
   }
 
@@ -508,6 +438,18 @@ class DatabaseStore {
         session.startedAt,
         session.expiresAt
       );
+
+    if (isSupabaseConfigured() && supabase) {
+      supabase.from('talk_now_sessions').insert({
+        id: session.id,
+        user_id: session.userId,
+        intent: 'General',
+        topic: session.topic,
+        status: session.status,
+        started_at: session.startedAt,
+        expires_at: session.expiresAt,
+      }).then(() => {});
+    }
 
     return session;
   }
@@ -571,17 +513,6 @@ class DatabaseStore {
       }
     }
 
-    const eligible = this.getAllActiveUsers(userId);
-    const topicMatches = eligible.filter((u) => {
-      if (normalizedTopic === 'general') return true;
-      return u.interests.some((i) => i.toLowerCase().includes(normalizedTopic) || normalizedTopic.includes(i.toLowerCase()));
-    });
-
-    const pool = topicMatches.length > 0 ? topicMatches : eligible;
-    if (pool.length > 0) {
-      return { candidate: pool[Math.floor(Math.random() * pool.length)] };
-    }
-
     return null;
   }
 
@@ -611,6 +542,18 @@ class DatabaseStore {
     sqlite
       .prepare('INSERT INTO matches (id, user_a_id, user_b_id, topic, status, created_at) VALUES (?, ?, ?, ?, ?, ?)')
       .run(id, userAId, userBId, topic, 'active', now);
+
+    if (isSupabaseConfigured() && supabase) {
+      const uA = userAId < userBId ? userAId : userBId;
+      const uB = userAId < userBId ? userBId : userAId;
+      supabase.from('matches').insert({
+        id,
+        user_a_id: uA,
+        user_b_id: uB,
+        topic,
+        status: 'active',
+      }).then(() => {});
+    }
 
     return { id, userAId, userBId, topic, status: 'active', createdAt: now };
   }
