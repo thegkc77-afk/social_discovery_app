@@ -12,21 +12,14 @@ import { logoutUser } from '../services/auth';
 import { getUserCache } from '../utils/storage';
 import { User } from '../data/mockData';
 
-const AVATAR_OPTIONS = [
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&h=400&q=80',
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&h=400&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=400&h=400&q=80',
-  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=400&h=400&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=400&h=400&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&h=400&q=80',
-];
+const AVATAR_OPTIONS: string[] = [];
 
 export default function ProfileScreen() {
   const router = useRouter();
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAvailable, setIsAvailable] = useState(true);
-  const [profileAvatar, setProfileAvatar] = useState(AVATAR_OPTIONS[0]);
+  const [profileAvatar, setProfileAvatar] = useState('');
   const [chosenPhotos, setChosenPhotos] = useState<string[]>([]);
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
 
@@ -215,19 +208,23 @@ export default function ProfileScreen() {
               <Text style={styles.galleryButtonText}>Upload from Phone Gallery</Text>
             </TouchableOpacity>
 
-            <Text style={styles.sectionSubtitle}>Or choose from presets:</Text>
-            <View style={styles.avatarsGrid}>
-              {AVATAR_OPTIONS.map((uri, idx) => (
-                <TouchableOpacity key={idx} onPress={() => handleSelectPhoto(uri)} style={styles.avatarThumbnailWrapper}>
-                  <Image source={{ uri }} style={styles.avatarThumbnail} />
-                  {profileAvatar === uri && (
-                    <View style={styles.activeCheckBadge}>
-                      <Check size={14} color={Colors.white} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
+            {AVATAR_OPTIONS.length > 0 && (
+              <>
+                <Text style={styles.sectionSubtitle}>Or choose from presets:</Text>
+                <View style={styles.avatarsGrid}>
+                  {AVATAR_OPTIONS.map((uri, idx) => (
+                    <TouchableOpacity key={idx} onPress={() => handleSelectPhoto(uri)} style={styles.avatarThumbnailWrapper}>
+                      <Image source={{ uri }} style={styles.avatarThumbnail} />
+                      {profileAvatar === uri && (
+                        <View style={styles.activeCheckBadge}>
+                          <Check size={14} color={Colors.white} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>

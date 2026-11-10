@@ -15,8 +15,10 @@ import Avatar from '../components/ui/Avatar';
 import VerifiedBadge from '../components/ui/VerifiedBadge';
 import { Heart, MessageCircle, Share2, Sparkles, Plus, Compass } from 'lucide-react-native';
 import { fetchFeed, fetchStories, likePost, unlikePost, FeedPost, UserStoryGroup } from '../services/social';
+import { getUserCache } from '../utils/storage';
 
 export default function SocialDiscoveryScreen() {
+  const [currentUserAvatar, setCurrentUserAvatar] = useState<string>('');
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [stories, setStories] = useState<UserStoryGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +43,11 @@ export default function SocialDiscoveryScreen() {
 
   useEffect(() => {
     let isMounted = true;
+    getUserCache().then((cached) => {
+      if (isMounted && cached?.avatar) {
+        setCurrentUserAvatar(cached.avatar);
+      }
+    });
     Promise.all([fetchFeed(20), fetchStories()]).then(([feedData, storyData]) => {
       if (isMounted) {
         setPosts(feedData.posts);
@@ -110,7 +117,7 @@ export default function SocialDiscoveryScreen() {
             {/* User Create Story Item */}
             <TouchableOpacity style={styles.storyItem}>
               <View style={[styles.storyRing, { borderColor: Colors.surface }]}>
-                <Avatar uri="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&h=400&q=80" size={56} />
+                <Avatar uri={currentUserAvatar || undefined} size={56} />
                 <View style={styles.addStoryPlus}>
                   <Plus size={12} color="#FFF" />
                 </View>

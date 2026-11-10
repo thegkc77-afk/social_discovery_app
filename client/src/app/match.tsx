@@ -22,7 +22,7 @@ export default function MatchScreen() {
   const matchedUserIdParam = (params.userId as string) || '';
 
   const [status, setStatus] = useState<'searching' | 'matched'>(matchId ? 'matched' : 'searching');
-  const [myAvatar, setMyAvatar] = useState('https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&h=400&q=80');
+  const [myAvatar, setMyAvatar] = useState('');
 
   useEffect(() => {
     getUserCache().then((cached) => {
@@ -30,28 +30,37 @@ export default function MatchScreen() {
       else if (cached?.profilePhotos && cached.profilePhotos.length > 0) setMyAvatar(cached.profilePhotos[0]);
     });
   }, []);
-  const [matchedUser, setMatchedUser] = useState<User | null>(() => {
-    if (matchId) {
-      return {
-        id: matchedUserIdParam || 'tanya',
-        name: 'Tanya',
-        age: 22,
-        bio: `Gamer girl matched on ${topic}! 🎮`,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&h=400&q=80',
-        distance: '0.8 km away',
-        location: 'Patna, India',
-        online: true,
-        vibes: [topic],
-        likes: 15,
-        commentsCount: 4,
-        hasLiked: false,
-        verificationStatus: 'verified',
-        verified: true,
-        messages: []
-      };
+
+  const [matchedUser, setMatchedUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    if (matchId && matchedUserIdParam) {
+      fetchDiscoveryFeed().then((feed) => {
+        const found = feed.find((u) => u.id === matchedUserIdParam);
+        if (found) {
+          setMatchedUser(found);
+        } else {
+          setMatchedUser({
+            id: matchedUserIdParam,
+            name: 'Vibe Match Partner',
+            age: 23,
+            bio: `Matched on ${topic}!`,
+            avatar: '',
+            distance: 'Nearby',
+            location: '',
+            online: true,
+            vibes: [topic],
+            likes: 0,
+            commentsCount: 0,
+            hasLiked: false,
+            verificationStatus: 'verified',
+            verified: true,
+            messages: [],
+          });
+        }
+      });
     }
-    return null;
-  });
+  }, [matchId, matchedUserIdParam, topic]);
 
   // Animation values
   const [radarScale1] = useState(() => new Animated.Value(0.5));
@@ -123,16 +132,16 @@ export default function MatchScreen() {
             if (data?.matchId) {
               setMatchedUser({
                 id: data.userId || 'partner',
-                name: 'Vibe Match Partner',
-                age: 23,
-                bio: `Matched on ${topic}!`,
-                avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
-                distance: '0.8 km away',
-                location: 'Patna, India',
+                name: data.name || 'Vibe Match Partner',
+                age: data.age || 23,
+                bio: data.bio || `Matched on ${topic}!`,
+                avatar: data.avatar || '',
+                distance: data.distance || 'Nearby',
+                location: data.location || '',
                 online: true,
                 vibes: [topic],
-                likes: 15,
-                commentsCount: 4,
+                likes: 0,
+                commentsCount: 0,
                 hasLiked: false,
                 verificationStatus: 'verified',
                 verified: true,

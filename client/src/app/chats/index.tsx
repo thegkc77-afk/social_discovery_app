@@ -55,7 +55,7 @@ export default function ChatsIndexScreen() {
         style={({ pressed }) => [styles.chatRow, pressed && styles.chatRowPressed]}
       >
         <Avatar
-          source={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&h=200&q=80'}
+          source={user?.avatar || undefined}
           size={56}
           showOnlineStatus
           online={true}
