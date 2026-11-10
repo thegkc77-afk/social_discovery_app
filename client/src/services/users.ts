@@ -15,29 +15,28 @@ export const fetchUserProfile = async (_userId?: string): Promise<User | null> =
         const photos = Array.isArray(u.photos)
           ? u.photos.map((p: any) => (typeof p === 'string' ? p : p.photo_url || p.url))
           : [];
-        const primaryAvatar =
-          photos[0] || u.avatar || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&h=400&q=80';
+        const primaryAvatar = photos[0] || u.avatar || '';
 
         const userObj: User = {
           id: u.id,
-          name: u.name || 'Vibe User',
+          name: u.name || '',
           age: u.dateOfBirth
             ? Math.floor((Date.now() - new Date(u.dateOfBirth).getTime()) / 31557600000)
-            : 23,
+            : 0,
           avatar: primaryAvatar,
           detailImage: photos[1] || primaryAvatar,
           distance: '0 km away',
-          location: u.location?.name || 'Bangalore, India',
+          location: u.location?.name || '',
           online: true,
-          vibes: u.interests && u.interests.length > 0 ? u.interests : ['Gaming', 'Music'],
+          vibes: u.interests && u.interests.length > 0 ? u.interests : [],
           bio: u.bio || '',
           likes: 0,
           commentsCount: 0,
           hasLiked: false,
           messages: [],
           verificationStatus: u.isVerified ? 'verified' : 'not_started',
-          intent: (u.intents && u.intents[0]) || 'Dating',
-          connectionIntents: u.intents && u.intents.length > 0 ? u.intents : ['Dating'],
+          intent: (u.intents && u.intents[0]) || '',
+          connectionIntents: u.intents && u.intents.length > 0 ? u.intents : [],
           isAvailable: true,
           phoneVerified: Boolean(u.phone),
           profileVerified: Boolean(u.isVerified),

@@ -131,7 +131,7 @@ export const loginUser = async (
 
 export const fetchCurrentUser = async (): Promise<AuthUser | null> => {
   const token = await getAccessToken();
-  if (!token) return null;
+  if (!token || token === 'mock-otp-token') return null;
 
   try {
     const res = await fetch(`${API_BASE_URL}/auth/me`, {
@@ -166,9 +166,23 @@ export const ensureAuthenticated = async (): Promise<{ token: string; user: Auth
   const existingToken = await getAccessToken();
   const existingUser = await getUserCache();
 
-  if (existingToken && existingUser) {
-    return { token: existingToken, user: existingUser };
+  if (existingToken && existingUser && existingToken !== 'mock-otp-token') {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/me`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${existingToken}`,
+        },
+      });
+      const data = await res.json();
+      if (data.success && data.user) {
+        return { token: existingToken, user: data.user };
+      }
+    } catch {}
   }
+
+  await clearAuthStorage();
 
   const randomSuffix = Math.floor(Math.random() * 10000);
   const name = `VibeUser_${randomSuffix}`;
