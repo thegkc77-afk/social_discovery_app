@@ -1,0 +1,50 @@
+import http from 'http';
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import { ENV } from './config/env.js';
+import { initSocketIO } from './socket/index.js';
+
+import authRoutes from './routes/auth.routes.js';
+import profileRoutes from './routes/profile.routes.js';
+import catalogRoutes from './routes/catalog.routes.js';
+import usersRoutes from './routes/users.routes.js';
+import talkNowRoutes from './routes/talkNow.routes.js';
+import matchesRoutes from './routes/matches.routes.js';
+import socialRoutes from './routes/social.routes.js';
+
+const app = express();
+const server = http.createServer(app);
+
+app.use(
+  cors({
+    origin: ENV.CLIENT_ORIGIN === '*' ? true : ENV.CLIENT_ORIGIN,
+    credentials: true,
+  })
+);
+app.use(express.json());
+
+initSocketIO(server, ENV.CLIENT_ORIGIN);
+
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok', database: 'sqlite', time: new Date().toISOString() });
+});
+
+app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api', catalogRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/talk-now', talkNowRoutes);
+app.use('/api/matches', matchesRoutes);
+app.use('/api/social', socialRoutes);
+
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[ServerError]', err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal Server Error',
+  });
+});
+
+server.listen(ENV.PORT, '0.0.0.0', () => {
+  console.log(`🚀 VibeMatch Server running with real SQLite on http://0.0.0.0:${ENV.PORT}`);
+});
