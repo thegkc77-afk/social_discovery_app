@@ -166,3 +166,11 @@ sqlite.exec(`
   );
 `);
 
+try {
+  sqlite.exec('ALTER TABLE users ADD COLUMN two_factor_enabled INTEGER DEFAULT 0;');
+} catch {}
+try {
+  sqlite.exec('ALTER TABLE users ADD COLUMN phone_verified INTEGER DEFAULT 0;');
+} catch {}
+
+

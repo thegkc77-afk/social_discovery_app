@@ -19,6 +19,8 @@ export interface User {
   interests: string[];
   intents: string[];
   isVerified: boolean;
+  phoneVerified?: boolean;
+  twoFactorEnabled?: boolean;
   accountStatus: 'active' | 'suspended' | 'deleted';
   location?: {
     name: string;
@@ -161,8 +163,8 @@ class DatabaseStore {
       INSERT INTO users (
         id, name, email, phone, password_hash, date_of_birth, gender, bio,
         occupation, education, relationship_goal, avatar, is_verified, account_status,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        two_factor_enabled, phone_verified, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -180,6 +182,8 @@ class DatabaseStore {
       user.avatar || '',
       user.isVerified ? 1 : 0,
       user.accountStatus || 'active',
+      user.twoFactorEnabled ? 1 : 0,
+      user.phoneVerified ? 1 : 0,
       user.createdAt,
       user.updatedAt
     );
@@ -212,6 +216,8 @@ class DatabaseStore {
           relationship_goal: user.relationshipGoal || '',
           avatar_path: user.avatar || '',
           account_status: user.accountStatus || 'active',
+          two_factor_enabled: Boolean(user.twoFactorEnabled),
+          phone_verified: Boolean(user.phoneVerified),
           onboarding_completed: user.isVerified,
         });
       } catch (e) {
@@ -274,6 +280,8 @@ class DatabaseStore {
       interests,
       intents,
       isVerified: Boolean(row.is_verified),
+      phoneVerified: Boolean(row.phone_verified),
+      twoFactorEnabled: Boolean(row.two_factor_enabled),
       accountStatus: row.account_status,
       location: loc
         ? {
@@ -299,7 +307,8 @@ class DatabaseStore {
       UPDATE users SET
         name = ?, email = ?, phone = ?, date_of_birth = ?, gender = ?,
         bio = ?, occupation = ?, education = ?, relationship_goal = ?,
-        avatar = ?, is_verified = ?, account_status = ?, updated_at = ?
+        avatar = ?, is_verified = ?, account_status = ?, two_factor_enabled = ?,
+        phone_verified = ?, updated_at = ?
       WHERE id = ?
     `)
       .run(
@@ -315,6 +324,8 @@ class DatabaseStore {
         updated.avatar || '',
         updated.isVerified ? 1 : 0,
         updated.accountStatus || 'active',
+        updated.twoFactorEnabled ? 1 : 0,
+        updated.phoneVerified ? 1 : 0,
         updated.updatedAt,
         id
       );
@@ -344,6 +355,8 @@ class DatabaseStore {
           education: updated.education,
           relationship_goal: updated.relationshipGoal,
           avatar_path: updated.avatar,
+          two_factor_enabled: updated.twoFactorEnabled,
+          phone_verified: updated.phoneVerified,
           onboarding_completed: updated.isVerified,
           updated_at: updated.updatedAt,
         })
