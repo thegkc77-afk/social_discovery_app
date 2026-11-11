@@ -1,38 +1,61 @@
 import nodemailer, { Transporter } from 'nodemailer';
+import { ENV } from '../config/env.js';
 import { isSupabaseConfigured, supabase } from '../db/supabase.js';
+
+export interface EmailSendResult {
+  sent: boolean;
+  provider: 'resend' | 'smtp' | 'none';
+  reason?: string;
+}
 
 let transporter: Transporter | null = null;
 
-function getTransporter(): Transporter {
+export function isEmailConfigured(): boolean {
+  return Boolean(ENV.RESEND_API_KEY || (ENV.SMTP_USER && ENV.SMTP_PASS));
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function getSmtpTransporter(): Transporter | null {
   if (transporter) return transporter;
+  if (!ENV.SMTP_USER || !ENV.SMTP_PASS) return null;
 
-  const host = process.env.SMTP_HOST;
-  const port = parseInt(process.env.SMTP_PORT || '587', 10);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const isGmail = ENV.SMTP_USER.toLowerCase().includes('@gmail.com');
+  const host = ENV.SMTP_HOST || (isGmail ? 'smtp.gmail.com' : '');
+  if (!host) return null;
 
-  if (host && user && pass) {
-    transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
-  } else {
-    transporter = nodemailer.createTransport({
-      streamTransport: true,
-      newline: 'unix',
-      buffer: true,
-    });
-  }
+  const port = process.env.SMTP_PORT ? ENV.SMTP_PORT : (host === 'smtp.gmail.com' ? 465 : 587);
+
+  transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 8000,
+    auth: {
+      user: ENV.SMTP_USER,
+      pass: ENV.SMTP_PASS,
+    },
+  });
 
   return transporter;
 }
 
-export async function sendWelcomeEmail(toEmail: string, displayName: string): Promise<boolean> {
-  const cleanEmail = toEmail.trim().toLowerCase();
-  const name = displayName.trim() || 'User';
+export async function sendWelcomeEmail(toEmail: string, displayName?: string): Promise<EmailSendResult> {
+  const cleanEmail = toEmail?.trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return { sent: false, provider: 'none', reason: 'Invalid email address' };
+  }
 
+  const name = displayName?.trim() || 'User';
+  const safeHtmlName = escapeHtml(name);
   const subject = 'Welcome to VibeMatch';
 
   const textBody = `Dear ${name},
@@ -56,7 +79,7 @@ The VibeMatch Team`;
   <div style="border-bottom: 2px solid #e11d48; padding-bottom: 12px; margin-bottom: 24px;">
     <h2 style="color: #e11d48; margin: 0;">VibeMatch</h2>
   </div>
-  <p>Dear ${name},</p>
+  <p>Dear ${safeHtmlName},</p>
   <p>Thank you for creating your account with VibeMatch.</p>
   <p>Your registration has been successfully processed. You can now log in, complete your profile, set your discovery preferences, and connect with people who share your interests.</p>
   <div style="background-color: #f8fafc; border-left: 4px solid #e11d48; padding: 12px 16px; margin: 20px 0;">
@@ -68,32 +91,72 @@ The VibeMatch Team`;
 </body>
 </html>`;
 
-  try {
-    const transport = getTransporter();
-    const fromAddress = process.env.SMTP_FROM || '"VibeMatch" <no-reply@vibematch.local>';
-
-    const info = await transport.sendMail({
-      from: fromAddress,
-      to: cleanEmail,
-      subject,
-      text: textBody,
-      html: htmlBody,
-    });
-
-    console.log(`[EmailService] Welcome email sent to ${cleanEmail}`);
-    if (info.message) {
-      console.log(`[EmailService] Preview output generated for ${cleanEmail}`);
-    }
-
+  const syncTimestamp = async () => {
     if (isSupabaseConfigured() && supabase) {
       try {
         await supabase.from('profiles').update({ updated_at: new Date().toISOString() }).eq('email', cleanEmail);
       } catch {}
     }
+  };
 
-    return true;
-  } catch (error: any) {
-    console.warn(`[EmailService] Could not send welcome email to ${cleanEmail}:`, error?.message || error);
-    return false;
+  if (ENV.RESEND_API_KEY) {
+    try {
+      const fromAddress = ENV.SMTP_FROM || 'VibeMatch <onboarding@resend.dev>';
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${ENV.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: fromAddress,
+          to: [cleanEmail],
+          subject,
+          text: textBody,
+          html: htmlBody,
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.warn(`[EmailService] Resend failed for ${cleanEmail}:`, errText);
+        return { sent: false, provider: 'resend', reason: errText };
+      }
+
+      console.log(`[EmailService] Welcome email sent via Resend to ${cleanEmail}`);
+      await syncTimestamp();
+      return { sent: true, provider: 'resend' };
+    } catch (error: any) {
+      const msg = error?.message || String(error);
+      console.warn(`[EmailService] Resend error for ${cleanEmail}:`, msg);
+      return { sent: false, provider: 'resend', reason: msg };
+    }
   }
+
+  const smtpTransport = getSmtpTransporter();
+  if (smtpTransport) {
+    try {
+      const fromAddress = ENV.SMTP_FROM || `"VibeMatch" <${ENV.SMTP_USER}>`;
+      await smtpTransport.sendMail({
+        from: fromAddress,
+        to: cleanEmail,
+        subject,
+        text: textBody,
+        html: htmlBody,
+      });
+
+      console.log(`[EmailService] Welcome email sent via SMTP to ${cleanEmail}`);
+      await syncTimestamp();
+      return { sent: true, provider: 'smtp' };
+    } catch (error: any) {
+      const msg = error?.message || String(error);
+      console.warn(`[EmailService] SMTP error for ${cleanEmail}:`, msg);
+      return { sent: false, provider: 'smtp', reason: msg };
+    }
+  }
+
+  console.warn(
+    `[EmailService] Skipped welcome email to ${cleanEmail}: configure SMTP_USER/SMTP_PASS (or RESEND_API_KEY) in server/.env.local`
+  );
+  return { sent: false, provider: 'none', reason: 'Email provider not configured' };
 }
