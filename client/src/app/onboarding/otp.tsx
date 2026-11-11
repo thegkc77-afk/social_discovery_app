@@ -28,6 +28,7 @@ export default function OtpScreen() {
   const tempToken = (params.tempToken as string) || '';
   const phone = (params.phone as string) || '';
   const dialCode = (params.dialCode as string) || onboarding.countryCode || '+91';
+  const smsDelivered = params.smsDelivered !== 'false';
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
@@ -123,9 +124,14 @@ export default function OtpScreen() {
     if (secondsLeft > 0) return;
     setResending(true);
     try {
-      await sendOTP(`${dialCode}${phone}`);
+      const res = await sendOTP(`${dialCode}${phone}`);
       setSecondsLeft(RESEND_SECONDS);
-      Alert.alert('Code Sent', 'A new 6-digit OTP code has been sent to your number.');
+      Alert.alert(
+        res?.smsDelivered ? 'Code Sent' : 'OTP Ready',
+        res?.smsDelivered
+          ? 'A new 6-digit OTP code has been sent to your number.'
+          : 'SMS delivery is not configured yet. Check your server console for the verification code.'
+      );
     } catch (e) {
       console.error(e);
     } finally {
@@ -144,8 +150,10 @@ export default function OtpScreen() {
           <View style={styles.headerTextSection}>
             <Text style={styles.title}>Enter your verification code</Text>
             <Text style={styles.description}>
-              We sent a 6-digit code to{' '}
-              <Text style={styles.phoneHighlight}>{dialCode} {phone || 'XXXXX XXXXX'}</Text>.
+              {smsDelivered ? 'We sent a 6-digit code to ' : 'SMS provider not configured. Enter the server console code for '}
+              <Text style={styles.phoneHighlight}>
+                {is2FA ? phone : `${dialCode} ${phone || 'XXXXX XXXXX'}`}
+              </Text>.
             </Text>
             <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} style={styles.editBtn}>
               <Text style={styles.editPhoneText}>Edit phone number</Text>

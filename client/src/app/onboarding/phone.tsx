@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
   Pressable,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Phone, Shield, ShieldCheck, ArrowRight } from 'lucide-react-native';
@@ -34,14 +35,19 @@ export default function PhoneScreen() {
     if (!isValid) return;
     setLoading(true);
     try {
-      await sendOTP(`${country.dialCode}${phone}`);
+      const otpRes = await sendOTP(`${country.dialCode}${phone}`);
       onboarding.setPhone(phone, country.dialCode);
       router.push({
         pathname: '/onboarding/otp',
-        params: { phone, dialCode: country.dialCode },
+        params: {
+          phone,
+          dialCode: country.dialCode,
+          smsDelivered: otpRes?.smsDelivered ? 'true' : 'false',
+        },
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      Alert.alert('Error', e?.message || 'Unable to send OTP right now.');
     } finally {
       setLoading(false);
     }

@@ -30,6 +30,7 @@ export interface LoginResult {
   twoFactorRequired?: boolean;
   tempToken?: string;
   phoneMasked?: string;
+  smsDelivered?: boolean;
   token?: string;
   user?: AuthUser;
   message?: string;
@@ -56,9 +57,15 @@ export const sendOTP = async (phone: string, dialCode = '+91') => {
 
 export const verifyOTP = async (phone: string, otp: string) => {
   try {
+    const existingToken = await getAccessToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (existingToken) {
+      headers.Authorization = `Bearer ${existingToken}`;
+    }
+
     const res = await fetch(`${API_BASE_URL}/auth/otp/verify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ phone, otp }),
     });
     const data = await res.json();
@@ -190,6 +197,7 @@ export const loginUser = async (
         twoFactorRequired: true,
         tempToken: data.tempToken,
         phoneMasked: data.phoneMasked,
+        smsDelivered: data.smsDelivered,
         message: data.message,
       };
     }

@@ -49,8 +49,11 @@ export default function LoginScreen() {
 
     try {
       if (isSignUp) {
-        await registerUser(targetName, targetEmail, targetPassword, '2000-01-01');
-        Alert.alert('Success', 'Account created successfully. A welcome email has been sent.');
+        const signupRes = await registerUser(targetName, targetEmail, targetPassword, '2000-01-01');
+        const msg = signupRes?.welcomeEmailSent
+          ? 'Account created successfully. A welcome email has been sent.'
+          : 'Account created successfully.';
+        Alert.alert('Success', msg);
         router.replace('/onboarding/phone');
       } else {
         const loginRes = await loginUser(targetEmail, targetPassword);
@@ -61,6 +64,7 @@ export default function LoginScreen() {
               is2FA: 'true',
               tempToken: loginRes.tempToken,
               phone: loginRes.phoneMasked || 'registered number',
+              smsDelivered: loginRes.smsDelivered ? 'true' : 'false',
             },
           });
           return;
