@@ -15,7 +15,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowRight } from 'lucide-react-native';
 import Button from '../../components/ui/Button';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
-import { verifyOTP, sendOTP } from '../../services/auth';
+import { verifyOTP, sendOTP, verifyTwoFactor } from '../../services/auth';
 import { useOnboarding } from '../../context/OnboardingContext';
 
 const RESEND_SECONDS = 30;
@@ -24,6 +24,8 @@ export default function OtpScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const onboarding = useOnboarding();
+  const is2FA = params.is2FA === 'true';
+  const tempToken = (params.tempToken as string) || '';
   const phone = (params.phone as string) || '';
   const dialCode = (params.dialCode as string) || onboarding.countryCode || '+91';
 
@@ -92,15 +94,26 @@ export default function OtpScreen() {
     if (!isOtpComplete) return;
     setLoading(true);
     try {
+      if (is2FA && tempToken) {
+        const res = await verifyTwoFactor(tempToken, enteredOtp);
+        if (res.success && res.token) {
+          Alert.alert('Verification Successful', 'Two-step verification completed.');
+          router.replace('/match');
+        } else {
+          Alert.alert('Verification Failed', res.message || 'The OTP code is invalid. Please try again.');
+        }
+        return;
+      }
+
       const success = await verifyOTP(`${dialCode}${phone}`, enteredOtp);
       if (success) {
         router.push('/onboarding/profile');
       } else {
         Alert.alert('Verification Failed', 'The OTP code is invalid. Please try again.');
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      Alert.alert('Error', 'An error occurred during verification.');
+      Alert.alert('Error', e?.message || 'An error occurred during verification.');
     } finally {
       setLoading(false);
     }

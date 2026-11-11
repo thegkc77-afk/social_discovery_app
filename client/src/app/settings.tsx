@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { getTwoFactorStatus, enableTwoFactor, disableTwoFactor } from '../services/auth';
 import {
   ArrowLeft,
   ChevronRight,
@@ -50,6 +51,35 @@ export default function SettingsScreen() {
 
   // App Preferences Toggle State
   const [soundHaptics, setSoundHaptics] = useState(true);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+
+  useEffect(() => {
+    getTwoFactorStatus().then((res) => {
+      if (res.success) setTwoFactorEnabled(Boolean(res.twoFactorEnabled));
+    });
+  }, []);
+
+  const handleToggle2FA = async (enable: boolean) => {
+    try {
+      if (enable) {
+        const res = await enableTwoFactor();
+        if (res.success) {
+          setTwoFactorEnabled(true);
+          Alert.alert('Security', 'Two-step verification has been enabled.');
+        } else {
+          Alert.alert('Error', res.message || 'Could not enable two-step verification.');
+        }
+      } else {
+        const res = await disableTwoFactor();
+        if (res.success) {
+          setTwoFactorEnabled(false);
+          Alert.alert('Security', 'Two-step verification has been disabled.');
+        }
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to update two-step verification setting.');
+    }
+  };
 
   const handleLogout = () => {
     if (Platform.OS === 'web') {
@@ -145,10 +175,12 @@ export default function SettingsScreen() {
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>Privacy & Safety</Text>
 
-          <SettingRow
+          <ToggleSettingRow
             icon={<Lock size={18} color="#F5537A" strokeWidth={2.2} />}
-            title="Privacy Settings"
-            subtitle="Control who can see your profile"
+            title="Two-Step Verification"
+            subtitle={twoFactorEnabled ? 'Active (protected by phone OTP)' : 'Protect your account with phone OTP'}
+            value={twoFactorEnabled}
+            onValueChange={handleToggle2FA}
           />
           <SettingRow
             icon={<Shield size={18} color="#F5537A" strokeWidth={2.2} />}

@@ -50,12 +50,24 @@ export default function LoginScreen() {
     try {
       if (isSignUp) {
         await registerUser(targetName, targetEmail, targetPassword, '2000-01-01');
-        Alert.alert('Success', 'Account created successfully!');
+        Alert.alert('Success', 'Account created successfully. A welcome email has been sent.');
+        router.replace('/onboarding/phone');
       } else {
-        await loginUser(targetEmail, targetPassword);
+        const loginRes = await loginUser(targetEmail, targetPassword);
+        if (loginRes.twoFactorRequired && loginRes.tempToken) {
+          router.push({
+            pathname: '/onboarding/otp',
+            params: {
+              is2FA: 'true',
+              tempToken: loginRes.tempToken,
+              phone: loginRes.phoneMasked || 'registered number',
+            },
+          });
+          return;
+        }
         Alert.alert('Success', 'Logged in successfully!');
+        router.replace('/match');
       }
-      router.replace('/onboarding/phone');
     } catch (error: any) {
       Alert.alert('Authentication Failed', error?.message || 'Unable to authenticate. Please check your credentials.');
     } finally {

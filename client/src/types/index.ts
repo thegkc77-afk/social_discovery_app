@@ -42,6 +42,7 @@ export interface User {
   intent?: string;
   isAvailable?: boolean;
   phoneVerified?: boolean;
+  twoFactorEnabled?: boolean;
   profileVerified?: boolean;
   profilePhotos?: string[];
   connectionIntents?: string[];
