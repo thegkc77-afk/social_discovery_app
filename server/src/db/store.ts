@@ -348,6 +348,8 @@ class DatabaseStore {
         .from('profiles')
         .update({
           display_name: updated.name,
+          phone: updated.phone || null,
+          email: updated.email || null,
           date_of_birth: updated.dateOfBirth,
           gender: updated.gender,
           bio: updated.bio,

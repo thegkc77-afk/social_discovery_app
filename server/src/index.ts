@@ -46,9 +46,23 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 import { isSupabaseConfigured, supabase } from './db/supabase.js';
+import { isEmailConfigured } from './services/email.service.js';
+import { isSmsConfigured } from './services/sms.service.js';
 
 server.listen(ENV.PORT, '0.0.0.0', () => {
   console.log(`🚀 VibeMatch Server running on http://0.0.0.0:${ENV.PORT}`);
+
+  if (isEmailConfigured()) {
+    console.log('✅ [EmailService] Welcome email delivery configured.');
+  } else {
+    console.log('⚠️  [EmailService] SMTP / Resend not configured. Set SMTP_USER/SMTP_PASS or RESEND_API_KEY in server/.env.local to send welcome emails.');
+  }
+
+  let directSmsReady = isSmsConfigured();
+  if (directSmsReady) {
+    console.log('✅ [SmsService] Direct SMS OTP provider configured.');
+  }
+
   if (isSupabaseConfigured() && supabase) {
     console.log(`📡 Connected to Supabase at: ${ENV.SUPABASE_URL}`);
     supabase
@@ -63,5 +77,26 @@ server.listen(ENV.PORT, '0.0.0.0', () => {
           console.log('✅ [Supabase] Connected and database schema verified.');
         }
       });
+
+    fetch(`${ENV.SUPABASE_URL}/auth/v1/settings`, {
+      headers: { apikey: ENV.SUPABASE_ANON_KEY },
+      signal: AbortSignal.timeout(4000),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((settings: any) => {
+        const phoneEnabled = Boolean(settings?.external?.phone);
+        if (phoneEnabled) {
+          console.log('✅ [Supabase Auth] Phone SMS provider enabled.');
+        } else if (!directSmsReady) {
+          console.log('⚠️  [SmsService] Supabase Phone Auth is disabled and no Twilio/Fast2SMS keys are set. Enable Phone Auth in Supabase Dashboard or add TWILIO_*/FAST2SMS_API_KEY in server/.env.local.');
+        }
+      })
+      .catch(() => {
+        if (!directSmsReady) {
+          console.log('⚠️  [SmsService] No Twilio/Fast2SMS keys set; SMS OTP relies on Supabase Phone Auth.');
+        }
+      });
+  } else if (!directSmsReady) {
+    console.log('⚠️  [SmsService] No SMS provider configured. OTP codes will only print in server logs.');
   }
 });

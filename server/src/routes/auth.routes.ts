@@ -8,9 +8,11 @@ import {
   generateToken,
   generate2FATempToken,
   verify2FATempToken,
+  getOptionalAuthUser,
 } from '../middleware/auth.js';
 import { isSupabaseConfigured, supabase } from '../db/supabase.js';
 import { sendWelcomeEmail } from '../services/email.service.js';
+import { sendSmsOtp } from '../services/sms.service.js';
 
 const router = Router();
 
@@ -46,34 +48,16 @@ router.post('/otp/send', async (req, res: Response) => {
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
   const result = db.createOtp(cleanPhone, otpCode);
 
-  let sentViaSupabase = false;
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: cleanPhone,
-      });
-      if (!error) {
-        sentViaSupabase = true;
-      } else {
-        console.log('[Supabase OTP Info]', error.message);
-      }
-    } catch (err: any) {
-      console.warn('[Supabase OTP Warn]', err?.message || err);
-    }
-  }
-
-  console.log(`\n========================================`);
-  console.log(`[OTP SERVICE] Verification code for ${cleanPhone}: ${otpCode}`);
-  if (sentViaSupabase) {
-    console.log(`[Supabase Auth] Phone verification dispatched via Supabase.`);
-  }
-  console.log(`========================================\n`);
+  const smsResult = await sendSmsOtp(cleanPhone, otpCode);
 
   return res.json({
     success: true,
-    message: 'OTP sent successfully',
-    otp: otpCode,
-    sentViaSupabase,
+    message: smsResult.delivered
+      ? 'OTP sent to your phone via SMS'
+      : 'OTP generated (SMS provider not configured on server)',
+    smsDelivered: smsResult.delivered,
+    provider: smsResult.provider,
+    otp: !smsResult.delivered && process.env.NODE_ENV !== 'production' ? otpCode : undefined,
     expiresAt: result.expiresAt,
   });
 });
@@ -102,17 +86,30 @@ router.post('/otp/verify', async (req, res: Response) => {
   }
 
   if (!valid) {
-    valid = db.verifyOtp(cleanPhone, cleanOtp) || cleanOtp === '123456';
+    valid = db.verifyOtp(cleanPhone, cleanOtp) || (process.env.NODE_ENV !== 'production' && cleanOtp === '123456');
   }
 
   if (!valid) {
     return res.status(400).json({ success: false, message: 'Invalid or expired OTP code' });
   }
 
-  let user = db.findUserByPhone(cleanPhone);
+  const sessionUser = getOptionalAuthUser(req);
+  const phoneOwner = db.findUserByPhone(cleanPhone);
+
+  let user: User | undefined;
   let isNewUser = false;
 
-  if (!user) {
+  if (sessionUser) {
+    if (phoneOwner && phoneOwner.id !== sessionUser.id) {
+      return res.status(409).json({
+        success: false,
+        message: 'This phone number is already linked to another account',
+      });
+    }
+    user = db.updateUser(sessionUser.id, { phone: cleanPhone, phoneVerified: true }) || sessionUser;
+  } else if (phoneOwner) {
+    user = db.updateUser(phoneOwner.id, { phoneVerified: true }) || phoneOwner;
+  } else {
     isNewUser = true;
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash('SecureOtpUserPass123', salt);
@@ -134,13 +131,10 @@ router.post('/otp/verify', async (req, res: Response) => {
       createdAt: now,
       updatedAt: now,
     });
-  } else {
-    db.updateUser(user.id, { phoneVerified: true });
-    user.phoneVerified = true;
   }
 
   if (isNewUser && user.email) {
-    sendWelcomeEmail(user.email, user.name);
+    await sendWelcomeEmail(user.email, user.name);
   }
 
   const token = generateToken(user.id);
@@ -204,9 +198,7 @@ router.post('/signup', async (req, res: Response) => {
 
     await db.createUser(newUser);
 
-    if (cleanEmail) {
-      sendWelcomeEmail(cleanEmail, newUser.name);
-    }
+    const emailResult = cleanEmail ? await sendWelcomeEmail(cleanEmail, newUser.name) : null;
 
     const token = generateToken(newUser.id);
 
@@ -214,6 +206,8 @@ router.post('/signup', async (req, res: Response) => {
       success: true,
       token,
       user: sanitizeUser(newUser),
+      welcomeEmailSent: Boolean(emailResult?.sent),
+      welcomeEmailProvider: emailResult?.provider || 'none',
     });
   } catch (error: any) {
     return res.status(500).json({ success: false, message: error?.message || 'Signup failed' });
@@ -242,22 +236,18 @@ router.post('/login', async (req, res: Response) => {
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       db.createOtp(user.phone, otpCode);
 
-      if (isSupabaseConfigured() && supabase) {
-        try {
-          await supabase.auth.signInWithOtp({ phone: user.phone });
-        } catch {}
-      }
-
-      console.log(`\n========================================`);
-      console.log(`[2FA OTP] Two-Step verification code for ${user.phone}: ${otpCode}`);
-      console.log(`========================================\n`);
+      const smsResult = await sendSmsOtp(user.phone, otpCode);
 
       return res.json({
         success: true,
         twoFactorRequired: true,
         tempToken,
         phoneMasked: maskPhone(user.phone),
-        message: 'Two-step verification required. OTP sent to your phone.',
+        smsDelivered: smsResult.delivered,
+        provider: smsResult.provider,
+        message: smsResult.delivered
+          ? 'Two-step verification required. OTP sent to your phone.'
+          : 'Two-step verification required. Enter OTP from server console (SMS not configured).',
       });
     }
 
