@@ -1,5 +1,24 @@
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const serverRoot = path.resolve(__dirname, '../..');
+
+const candidatePaths = [
+  path.resolve(process.cwd(), '.env.local'),
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(serverRoot, '.env.local'),
+  path.resolve(serverRoot, '.env'),
+];
+
+for (const p of candidatePaths) {
+  if (fs.existsSync(p)) {
+    dotenv.config({ path: p, override: false });
+  }
+}
 
 export const ENV = {
   PORT: parseInt(process.env.PORT || '5000', 10),

@@ -5,8 +5,10 @@ CREATE EXTENSION IF NOT EXISTS "postgis";
 
 -- 1. Profiles
 CREATE TABLE IF NOT EXISTS public.profiles (
-    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     display_name TEXT NOT NULL,
+    phone TEXT UNIQUE,
+    email TEXT UNIQUE,
     date_of_birth DATE NOT NULL,
     gender TEXT,
     bio TEXT,

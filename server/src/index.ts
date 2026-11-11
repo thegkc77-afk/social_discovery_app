@@ -45,6 +45,23 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   });
 });
 
+import { isSupabaseConfigured, supabase } from './db/supabase.js';
+
 server.listen(ENV.PORT, '0.0.0.0', () => {
-  console.log(`🚀 VibeMatch Server running with real SQLite on http://0.0.0.0:${ENV.PORT}`);
+  console.log(`🚀 VibeMatch Server running on http://0.0.0.0:${ENV.PORT}`);
+  if (isSupabaseConfigured() && supabase) {
+    console.log(`📡 Connected to Supabase at: ${ENV.SUPABASE_URL}`);
+    supabase
+      .from('profiles')
+      .select('id')
+      .limit(1)
+      .then(({ error }) => {
+        if (error && error.code === 'PGRST205') {
+          console.log('⚡ [Supabase Notice] Tables not created yet in Supabase schema.');
+          console.log('👉 Run "server/supabase/migrations/20261110_init.sql" in your Supabase SQL Editor.');
+        } else if (!error) {
+          console.log('✅ [Supabase] Connected and database schema verified.');
+        }
+      });
+  }
 });

@@ -1,5 +1,8 @@
 node_modules
 dist
 .env
-data/db.json
-
+.env.*
+.env.local
+*.tsbuildinfo
+data/*.db-shm
+data/*.db-wal

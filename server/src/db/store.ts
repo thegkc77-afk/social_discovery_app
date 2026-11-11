@@ -202,14 +202,16 @@ class DatabaseStore {
         await supabase.from('profiles').upsert({
           id: user.id,
           display_name: user.name,
+          phone: user.phone || null,
+          email: user.email || null,
           date_of_birth: user.dateOfBirth || '2000-01-01',
-          gender: user.gender,
-          bio: user.bio,
-          occupation: user.occupation,
-          education: user.education,
-          relationship_goal: user.relationshipGoal,
-          avatar_path: user.avatar,
-          account_status: user.accountStatus,
+          gender: user.gender || '',
+          bio: user.bio || '',
+          occupation: user.occupation || '',
+          education: user.education || '',
+          relationship_goal: user.relationshipGoal || '',
+          avatar_path: user.avatar || '',
+          account_status: user.accountStatus || 'active',
           onboarding_completed: user.isVerified,
         });
       } catch (e) {
@@ -537,7 +539,7 @@ class DatabaseStore {
       };
     }
 
-    const id = `match_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const id = uuidv4();
     const now = new Date().toISOString();
     sqlite
       .prepare('INSERT INTO matches (id, user_a_id, user_b_id, topic, status, created_at) VALUES (?, ?, ?, ?, ?, ?)')
@@ -552,7 +554,16 @@ class DatabaseStore {
         user_b_id: uB,
         topic,
         status: 'active',
-      }).then(() => {});
+        created_at: now,
+      }).then(() => {
+        if (supabase) {
+          supabase.from('conversations').insert({
+            id: uuidv4(),
+            match_id: id,
+            created_at: now,
+          }).then(() => {});
+        }
+      });
     }
 
     return { id, userAId, userBId, topic, status: 'active', createdAt: now };
@@ -592,11 +603,26 @@ class DatabaseStore {
   }
 
   public createMessage(matchId: string, senderId: string, content: string): Message {
-    const id = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const id = uuidv4();
     const now = new Date().toISOString();
     sqlite
       .prepare('INSERT INTO messages (id, match_id, sender_id, content, created_at) VALUES (?, ?, ?, ?, ?)')
       .run(id, matchId, senderId, content, now);
+
+    if (isSupabaseConfigured() && supabase) {
+      supabase.from('conversations').select('id').eq('match_id', matchId).limit(1).then(({ data }) => {
+        const conversationId = data && data[0] ? data[0].id : matchId;
+        if (supabase) {
+          supabase.from('messages').insert({
+            id,
+            conversation_id: conversationId,
+            sender_id: senderId,
+            body: content,
+            created_at: now,
+          }).then(() => {});
+        }
+      });
+    }
 
     return { id, matchId, senderId, content, createdAt: now };
   }
