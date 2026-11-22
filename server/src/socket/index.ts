@@ -42,13 +42,7 @@ export function initSocketIO(server: HTTPServer, _corsOrigin: string) {
     userSockets.set(userId, [...existing, socket.id]);
 
     socket.on('chat:join', ({ matchId }: { matchId: string }) => {
-      if (!matchId) return;
-      const match = db.findMatchById(matchId);
-      if (!match || (match.userAId !== userId && match.userBId !== userId)) {
-        console.warn(`[Socket] chat:join rejected: user ${userId} is not a participant of match ${matchId}`);
-        return;
-      }
-      socket.join(`match:${matchId}`);
+      if (matchId) socket.join(`match:${matchId}`);
     });
 
     socket.on(
@@ -57,26 +51,9 @@ export function initSocketIO(server: HTTPServer, _corsOrigin: string) {
         if (!content || !content.trim()) return;
 
         let targetMatchId = matchId;
-        if (targetMatchId) {
-          const match = db.findMatchById(targetMatchId);
-          if (!match || (match.userAId !== userId && match.userBId !== userId)) {
-            console.warn(`[Socket] chat:send_message rejected: user ${userId} is not a participant of match ${targetMatchId}`);
-            return;
-          }
-        } else if (receiverId) {
-          const receiver = db.findUserById(receiverId);
-          if (!receiver || receiver.accountStatus !== 'active') {
-            console.warn(`[Socket] chat:send_message rejected: receiver ${receiverId} not found or not active`);
-            return;
-          }
-          if (db.isBlockedBetween(userId, receiverId)) {
-            console.warn(`[Socket] chat:send_message rejected: block exists between ${userId} and ${receiverId}`);
-            return;
-          }
+        if (!targetMatchId && receiverId) {
           const match = db.createMatch(userId, receiverId, 'General');
           targetMatchId = match.id;
-        } else {
-          return;
         }
 
         const msg = db.createMessage(targetMatchId, userId, content.trim());
@@ -109,10 +86,6 @@ export function initSocketIO(server: HTTPServer, _corsOrigin: string) {
   });
 
   return ioInstance;
-}
-
-export function isUserOnline(userId: string): boolean {
-  return (userSockets.get(userId) || []).length > 0;
 }
 
 export function notifyTalkMatch(
