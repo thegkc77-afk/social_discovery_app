@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { sqlite } from './sqlite.js';
@@ -723,6 +724,22 @@ class DatabaseStore {
     }));
   }
 
+  public isBlockedBetween(userIdA: string, userIdB: string): boolean {
+    const row = sqlite
+      .prepare(
+        'SELECT 1 FROM blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?) LIMIT 1'
+      )
+      .get(userIdA, userIdB, userIdB, userIdA);
+    return !!row;
+  }
+
+  public hasActiveTalkNowSession(userId: string): boolean {
+    const row = sqlite
+      .prepare("SELECT 1 FROM talk_now_sessions WHERE user_id = ? AND status = 'searching' AND expires_at > ? LIMIT 1")
+      .get(userId, new Date().toISOString());
+    return !!row;
+  }
+
   public blockUser(blockerId: string, blockedId: string) {
     const id = `blk_${Date.now()}`;
     const now = new Date().toISOString();
@@ -848,3 +865,32 @@ class DatabaseStore {
 }
 
 export const db = new DatabaseStore();
+
+// One-time safety migration: accounts created while the server contained the
+// hardcoded backdoor passwords may still have those hashes. Anyone with the
+// old source could log in as them, so reset those passwords to a random
+// secret. Affected accounts sign in via OTP (phone) going forward.
+function migrateBackdooredPasswords() {
+  const legacyPasswords = ['SecurePassword123', 'SecureOtpUserPass123'];
+  const rows = sqlite.prepare('SELECT id, password_hash FROM users').all() as any[];
+  for (const row of rows) {
+    const compromised = legacyPasswords.some((legacy) => {
+      try {
+        return bcrypt.compareSync(legacy, row.password_hash);
+      } catch {
+        return false;
+      }
+    });
+    if (compromised) {
+      const newHash = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);
+      sqlite.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(
+        newHash,
+        new Date().toISOString(),
+        row.id
+      );
+      console.warn(`[SECURITY] Reset a compromised backdoored password for user ${row.id}; password login disabled, use OTP.`);
+    }
+  }
+}
+
+migrateBackdooredPasswords();
