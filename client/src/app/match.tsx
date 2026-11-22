@@ -5,7 +5,7 @@ import { Colors } from '../constants/theme';
 import Button from '../components/ui/Button';
 import Avatar from '../components/ui/Avatar';
 import { Sparkles, ArrowLeft } from 'lucide-react-native';
-import { findVibeMatch } from '../services/matching';
+import { findVibeMatch, fetchDiscoveryFeed } from '../services/matching';
 import { User } from '../data/mockData';
 import VerifiedBadge from '../components/ui/VerifiedBadge';
 import { getUserCache } from '../utils/storage';
