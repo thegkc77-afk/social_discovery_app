@@ -43,7 +43,6 @@ sqlite.exec(`
     otp TEXT NOT NULL,
     expires_at TEXT NOT NULL,
     verified INTEGER DEFAULT 0,
-    attempts INTEGER DEFAULT 0,
     created_at TEXT NOT NULL
   );
 
@@ -166,13 +165,6 @@ sqlite.exec(`
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
   );
 `);
-// Migration for databases created before OTP attempt limiting existed.
-try {
-  sqlite.exec('ALTER TABLE otps ADD COLUMN attempts INTEGER DEFAULT 0');
-} catch {
-  // Column already exists.
-}
-
 
 try {
   sqlite.exec('ALTER TABLE users ADD COLUMN two_factor_enabled INTEGER DEFAULT 0;');
@@ -180,4 +172,5 @@ try {
 try {
   sqlite.exec('ALTER TABLE users ADD COLUMN phone_verified INTEGER DEFAULT 0;');
 } catch {}
+
 
