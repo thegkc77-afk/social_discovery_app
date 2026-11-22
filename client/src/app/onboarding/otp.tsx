@@ -5,6 +5,7 @@ import {
   StyleSheet,
   SafeAreaView,
   TextInput,
+  TextInputInstance,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -42,12 +43,12 @@ export default function OtpScreen() {
     return () => clearTimeout(timer);
   }, [secondsLeft]);
 
-  const ref0 = useRef<TextInput>(null);
-  const ref1 = useRef<TextInput>(null);
-  const ref2 = useRef<TextInput>(null);
-  const ref3 = useRef<TextInput>(null);
-  const ref4 = useRef<TextInput>(null);
-  const ref5 = useRef<TextInput>(null);
+  const ref0 = useRef<TextInputInstance>(null);
+  const ref1 = useRef<TextInputInstance>(null);
+  const ref2 = useRef<TextInputInstance>(null);
+  const ref3 = useRef<TextInputInstance>(null);
+  const ref4 = useRef<TextInputInstance>(null);
+  const ref5 = useRef<TextInputInstance>(null);
   const inputRefs = [ref0, ref1, ref2, ref3, ref4, ref5];
 
   const applyDigits = (digits: string) => {
