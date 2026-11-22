@@ -5,6 +5,7 @@ import {
   StyleSheet,
   SafeAreaView,
   TextInput,
+  TextInputInstance,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -27,7 +28,7 @@ export default function PhoneScreen() {
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
-  const phoneInputRef = useRef<TextInput>(null);
+  const phoneInputRef = useRef<TextInputInstance>(null);
 
   const isValid = phone.length === country.digits && /^\d+$/.test(phone);
 
