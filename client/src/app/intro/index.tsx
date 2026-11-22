@@ -8,6 +8,7 @@ import {
   Dimensions,
   TouchableOpacity,
   ScrollView,
+  ScrollViewInstance,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
@@ -50,7 +51,7 @@ const slides = [
 
 export default function IntroScreen() {
   const router = useRouter();
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const [scrollX] = useState(() => new Animated.Value(0));
   const [activeIndex, setActiveIndex] = useState(0);
 
