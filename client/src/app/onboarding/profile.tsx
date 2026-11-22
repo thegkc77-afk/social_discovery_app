@@ -5,6 +5,7 @@ import {
   StyleSheet,
   SafeAreaView,
   TextInput,
+  TextInputInstance,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -39,10 +40,10 @@ export default function ProfileInfoScreen() {
   const [focusedField, setFocusedField] = useState<'name' | 'day' | 'month' | 'year' | null>(null);
 
   // Input refs for tap-anywhere focus and auto-advance
-  const nameRef = useRef<TextInput>(null);
-  const dayRef = useRef<TextInput>(null);
-  const monthRef = useRef<TextInput>(null);
-  const yearRef = useRef<TextInput>(null);
+  const nameRef = useRef<TextInputInstance>(null);
+  const dayRef = useRef<TextInputInstance>(null);
+  const monthRef = useRef<TextInputInstance>(null);
+  const yearRef = useRef<TextInputInstance>(null);
 
   const isDateValid = () => {
     const d = parseInt(day, 10);

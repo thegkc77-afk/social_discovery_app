@@ -100,7 +100,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFF9FA" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Clean Top Header */}
       <View style={styles.header}>
