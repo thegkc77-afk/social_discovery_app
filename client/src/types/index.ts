@@ -49,3 +49,4 @@ export interface User {
   talkNowAvailable?: boolean;
   verified?: boolean;
 }
+
