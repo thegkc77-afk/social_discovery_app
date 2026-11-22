@@ -5,10 +5,6 @@ import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
 
 const router = Router();
 
-function isParticipant(match: { userAId: string; userBId: string } | undefined, userId: string): boolean {
-  return !!match && (match.userAId === userId || match.userBId === userId);
-}
-
 router.get('/', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   if (!req.user) return res.status(401).json({ success: false });
   const userId = req.user.id;
@@ -46,11 +42,6 @@ router.get('/:id/messages', authMiddleware, (req: AuthenticatedRequest, res: Res
   const matchId = req.params.id as string;
   const limit = parseInt((req.query.limit as string) || '50', 10);
 
-  const match = db.findMatchById(matchId);
-  if (!isParticipant(match, req.user.id)) {
-    return res.status(403).json({ success: false, message: 'Not a participant in this match' });
-  }
-
   const messages = db.getMessagesForMatch(matchId, limit).map((m) => ({
     _id: m.id,
     id: m.id,
@@ -67,12 +58,7 @@ router.get('/:id/messages', authMiddleware, (req: AuthenticatedRequest, res: Res
 });
 
 router.patch('/:id/end', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
-  if (!req.user) return res.status(401).json({ success: false });
   const matchId = req.params.id as string;
-  const match = db.findMatchById(matchId);
-  if (!isParticipant(match, req.user.id)) {
-    return res.status(403).json({ success: false, message: 'Not a participant in this match' });
-  }
   const ended = db.endMatch(matchId);
   return res.json({ success: ended });
 });
@@ -82,13 +68,11 @@ router.post('/:id/block', authMiddleware, (req: AuthenticatedRequest, res: Respo
   const matchId = req.params.id as string;
   const match = db.findMatchById(matchId);
 
-  if (!match || !isParticipant(match, req.user.id)) {
-    return res.status(403).json({ success: false, message: 'Not a participant in this match' });
+  if (match) {
+    const otherId = match.userAId === req.user.id ? match.userBId : match.userAId;
+    db.blockUser(req.user.id, otherId);
+    db.endMatch(matchId);
   }
-
-  const otherId = match.userAId === req.user.id ? match.userBId : match.userAId;
-  db.blockUser(req.user.id, otherId);
-  db.endMatch(matchId);
 
   return res.json({ success: true, message: 'User blocked' });
 });
@@ -97,11 +81,6 @@ router.post('/:id/invite', authMiddleware, (req: AuthenticatedRequest, res: Resp
   if (!req.user) return res.status(401).json({ success: false });
   const matchId = req.params.id as string;
   const { recipientId, place, date, time, note } = req.body;
-
-  const match = db.findMatchById(matchId);
-  if (!isParticipant(match, req.user.id)) {
-    return res.status(403).json({ success: false, message: 'Not a participant in this match' });
-  }
 
   const proposal = db.createMeetProposal({
     id: uuidv4(),
@@ -126,3 +105,4 @@ router.post('/:id/invite', authMiddleware, (req: AuthenticatedRequest, res: Resp
 });
 
 export default router;
+

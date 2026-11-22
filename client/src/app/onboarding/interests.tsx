@@ -180,7 +180,7 @@ export default function InterestsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFF9FB" />
 
       {/* Top Header Row with Small Circular Back Button */}
       <View style={styles.topNavigation}>
@@ -519,4 +519,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3DCE3',
   },
 });
+
 

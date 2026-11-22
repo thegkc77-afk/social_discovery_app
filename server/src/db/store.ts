@@ -1,5 +1,3 @@
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { sqlite } from './sqlite.js';
 import { supabase, isSupabaseConfigured } from './supabase.js';
@@ -136,36 +134,23 @@ class DatabaseStore {
     const id = uuidv4();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
-    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
 
     sqlite.prepare('DELETE FROM otps WHERE phone = ?').run(phone);
     sqlite
       .prepare('INSERT INTO otps (id, phone, otp, expires_at, verified, created_at) VALUES (?, ?, ?, ?, 0, ?)')
-      .run(id, phone, otpHash, expiresAt, now.toISOString());
+      .run(id, phone, otp, expiresAt, now.toISOString());
 
     return { id, expiresAt };
   }
 
   public verifyOtp(phone: string, inputOtp: string): boolean {
     const row = sqlite
-      .prepare('SELECT * FROM otps WHERE phone = ? AND verified = 0 ORDER BY created_at DESC LIMIT 1')
-      .get(phone) as any;
+      .prepare('SELECT * FROM otps WHERE phone = ? AND otp = ? AND verified = 0 ORDER BY created_at DESC LIMIT 1')
+      .get(phone, inputOtp) as any;
 
     if (!row) return false;
 
     if (new Date(row.expires_at).getTime() < Date.now()) {
-      return false;
-    }
-
-    const maxAttempts = 5;
-    const attempts = typeof row.attempts === 'number' ? row.attempts : 0;
-    if (attempts >= maxAttempts) {
-      return false;
-    }
-
-    const inputHash = crypto.createHash('sha256').update(inputOtp).digest('hex');
-    if (row.otp !== inputHash) {
-      sqlite.prepare('UPDATE otps SET attempts = ? WHERE id = ?').run(attempts + 1, row.id);
       return false;
     }
 
@@ -724,22 +709,6 @@ class DatabaseStore {
     }));
   }
 
-  public isBlockedBetween(userIdA: string, userIdB: string): boolean {
-    const row = sqlite
-      .prepare(
-        'SELECT 1 FROM blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?) LIMIT 1'
-      )
-      .get(userIdA, userIdB, userIdB, userIdA);
-    return !!row;
-  }
-
-  public hasActiveTalkNowSession(userId: string): boolean {
-    const row = sqlite
-      .prepare("SELECT 1 FROM talk_now_sessions WHERE user_id = ? AND status = 'searching' AND expires_at > ? LIMIT 1")
-      .get(userId, new Date().toISOString());
-    return !!row;
-  }
-
   public blockUser(blockerId: string, blockedId: string) {
     const id = `blk_${Date.now()}`;
     const now = new Date().toISOString();
@@ -865,32 +834,3 @@ class DatabaseStore {
 }
 
 export const db = new DatabaseStore();
-
-// One-time safety migration: accounts created while the server contained the
-// hardcoded backdoor passwords may still have those hashes. Anyone with the
-// old source could log in as them, so reset those passwords to a random
-// secret. Affected accounts sign in via OTP (phone) going forward.
-function migrateBackdooredPasswords() {
-  const legacyPasswords = ['SecurePassword123', 'SecureOtpUserPass123'];
-  const rows = sqlite.prepare('SELECT id, password_hash FROM users').all() as any[];
-  for (const row of rows) {
-    const compromised = legacyPasswords.some((legacy) => {
-      try {
-        return bcrypt.compareSync(legacy, row.password_hash);
-      } catch {
-        return false;
-      }
-    });
-    if (compromised) {
-      const newHash = bcrypt.hashSync(crypto.randomBytes(32).toString('hex'), 10);
-      sqlite.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(
-        newHash,
-        new Date().toISOString(),
-        row.id
-      );
-      console.warn(`[SECURITY] Reset a compromised backdoored password for user ${row.id}; password login disabled, use OTP.`);
-    }
-  }
-}
-
-migrateBackdooredPasswords();

@@ -1,48 +1,56 @@
-# VibeMatch
+# Welcome to your Expo app 👋
 
-Social discovery app: an Expo / React Native client and an Express + Socket.IO backend with SQLite storage (optional Supabase sync).
+This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
-## Project layout
+## Get started
 
-- `client/` - Expo app (SDK 58, expo-router, TypeScript)
-- `server/` - Express + Socket.IO API (TypeScript, `node:sqlite`)
+1. Install dependencies
 
-## Prerequisites
+   ```bash
+   npm install
+   ```
 
-- Node.js 22.5 or newer (the server uses the built-in `node:sqlite` module)
-- npm
-- Expo Go (SDK 58) on your phone, or an emulator
+2. Start the app
 
-## Backend (`server/`)
+   ```bash
+   npx expo start
+   ```
 
-```bash
-cd server
-npm install
-npm run dev
-```
+In the output, you'll find options to open the app in a
 
-- The API listens on `http://localhost:5000`. `GET /api/health` returns `{"status":"ok"}`.
-- Local development works with no environment variables: a random JWT secret is generated on each boot and a warning is logged. Note that this forgets existing login sessions on every restart - set `JWT_SECRET` in `server/.env` (see `.env.example`) to keep sessions valid across restarts.
-- OTP in development: without SMS provider keys (Twilio or Fast2SMS in `.env`), the server generates the OTP itself and, outside production, includes it in the `/api/auth/otp/send` response so you can sign in during development.
-- Production (`NODE_ENV=production`): `JWT_SECRET` and an explicit `CLIENT_ORIGIN` are required (the server refuses to boot with a wildcard origin), and TLS must be terminated in front of the server.
+- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
+- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
+- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
+- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
-### First-boot security migration
+You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
-On startup the server resets the password of any account whose stored password still matches one of the previously hardcoded development backdoor passwords, replacing it with a random secret (one `[SECURITY]` log line per affected account). Those accounts can no longer sign in with a password; they sign in via OTP instead.
+## Get a fresh project
 
-## Client (`client/`)
+When you're ready, run:
 
 ```bash
-cd client
-npm install
-npx expo start
+npm run reset-project
 ```
 
-- Open the app in Expo Go (SDK 58) on the same Wi-Fi network as your computer.
-- The app auto-detects your computer's IP from Expo Go and calls the API at `http://<computer-ip>:5000/api`, so the backend must be running and reachable on your network.
-- To override the API address, set `EXPO_PUBLIC_API_URL` before starting Expo.
+This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
-## Checks run on this branch
+### Other setup steps
 
-- Client: `npx expo install --check`, `npx tsc --noEmit`, `npx expo export --platform android`
-- Server: `npx tsc --noEmit`, plus boot and API smoke tests against `npm run dev`
+- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
+- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
+- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+
+## Learn more
+
+To learn more about developing your project with Expo, look at the following resources:
+
+- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
+- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+
+## Join the community
+
+Join our community of developers creating universal apps.
+
+- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
+- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
