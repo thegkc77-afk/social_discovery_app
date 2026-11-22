@@ -64,6 +64,15 @@ export function initSocketIO(server: HTTPServer, _corsOrigin: string) {
             return;
           }
         } else if (receiverId) {
+          const receiver = db.findUserById(receiverId);
+          if (!receiver || receiver.accountStatus !== 'active') {
+            console.warn(`[Socket] chat:send_message rejected: receiver ${receiverId} not found or not active`);
+            return;
+          }
+          if (db.isBlockedBetween(userId, receiverId)) {
+            console.warn(`[Socket] chat:send_message rejected: block exists between ${userId} and ${receiverId}`);
+            return;
+          }
           const match = db.createMatch(userId, receiverId, 'General');
           targetMatchId = match.id;
         } else {
@@ -100,6 +109,10 @@ export function initSocketIO(server: HTTPServer, _corsOrigin: string) {
   });
 
   return ioInstance;
+}
+
+export function isUserOnline(userId: string): boolean {
+  return (userSockets.get(userId) || []).length > 0;
 }
 
 export function notifyTalkMatch(
