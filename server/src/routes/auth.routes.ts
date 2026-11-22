@@ -1,5 +1,7 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+import rateLimit from 'express-rate-limit';
 import { v4 as uuidv4 } from 'uuid';
 import { db, User } from '../db/store.js';
 import {
@@ -15,6 +17,27 @@ import { sendWelcomeEmail } from '../services/email.service.js';
 import { sendSmsOtp } from '../services/sms.service.js';
 
 const router = Router();
+
+// Throttle credential and OTP endpoints against brute force.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many attempts. Please try again later.' },
+});
+
+const otpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many OTP attempts. Please try again later.' },
+});
+
+function generateOtpCode(): string {
+  return crypto.randomInt(0, 1000000).toString().padStart(6, '0');
+}
 
 function isAtLeast18(dob: string): boolean {
   const birth = new Date(dob);
@@ -38,14 +61,14 @@ function maskPhone(phone: string): string {
   return `${prefix}******${last4}`;
 }
 
-router.post('/otp/send', async (req, res: Response) => {
+router.post('/otp/send', otpLimiter, async (req, res: Response) => {
   const { phone } = req.body;
   if (!phone || typeof phone !== 'string') {
     return res.status(400).json({ success: false, message: 'Valid phone number required' });
   }
 
   const cleanPhone = phone.trim();
-  const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpCode = generateOtpCode();
   const result = db.createOtp(cleanPhone, otpCode);
 
   const smsResult = await sendSmsOtp(cleanPhone, otpCode);
@@ -62,7 +85,7 @@ router.post('/otp/send', async (req, res: Response) => {
   });
 });
 
-router.post('/otp/verify', async (req, res: Response) => {
+router.post('/otp/verify', otpLimiter, async (req, res: Response) => {
   const { phone, otp } = req.body;
   if (!phone || !otp) {
     return res.status(400).json({ success: false, message: 'Phone and OTP required' });
@@ -86,7 +109,7 @@ router.post('/otp/verify', async (req, res: Response) => {
   }
 
   if (!valid) {
-    valid = db.verifyOtp(cleanPhone, cleanOtp) || (process.env.NODE_ENV !== 'production' && cleanOtp === '123456');
+    valid = db.verifyOtp(cleanPhone, cleanOtp);
   }
 
   if (!valid) {
@@ -112,7 +135,8 @@ router.post('/otp/verify', async (req, res: Response) => {
   } else {
     isNewUser = true;
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash('SecureOtpUserPass123', salt);
+    // OTP-created accounts get a random internal password; sign-in continues via OTP.
+    const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), salt);
     const now = new Date().toISOString();
     user = await db.createUser({
       id: uuidv4(),
@@ -166,7 +190,7 @@ router.post('/signup', async (req, res: Response) => {
     }
 
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password || 'SecurePassword123', salt);
+    const passwordHash = await bcrypt.hash(password || crypto.randomBytes(32).toString('hex'), salt);
     const now = new Date().toISOString();
 
     const cleanEmail = email ? email.trim().toLowerCase() : null;
@@ -214,7 +238,7 @@ router.post('/signup', async (req, res: Response) => {
   }
 });
 
-router.post('/login', async (req, res: Response) => {
+router.post('/login', loginLimiter, async (req, res: Response) => {
   try {
     const { email, phone, password } = req.body;
 
@@ -227,13 +251,13 @@ router.post('/login', async (req, res: Response) => {
     }
 
     const valid = await bcrypt.compare(password || '', user.passwordHash);
-    if (!valid && password !== 'SecurePassword123') {
+    if (!valid) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
     if (user.twoFactorEnabled && user.phone) {
       const tempToken = generate2FATempToken(user.id);
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpCode = generateOtpCode();
       db.createOtp(user.phone, otpCode);
 
       const smsResult = await sendSmsOtp(user.phone, otpCode);
@@ -262,7 +286,7 @@ router.post('/login', async (req, res: Response) => {
   }
 });
 
-router.post('/2fa/verify', async (req, res: Response) => {
+router.post('/2fa/verify', otpLimiter, async (req, res: Response) => {
   try {
     const { tempToken, otp } = req.body;
     if (!tempToken || !otp) {
@@ -294,7 +318,7 @@ router.post('/2fa/verify', async (req, res: Response) => {
     }
 
     if (!valid) {
-      valid = db.verifyOtp(user.phone, cleanOtp) || cleanOtp === '123456';
+      valid = db.verifyOtp(user.phone, cleanOtp);
     }
 
     if (!valid) {
