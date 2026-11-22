@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { sqlite } from './sqlite.js';
 import { supabase, isSupabaseConfigured } from './supabase.js';
@@ -134,23 +135,36 @@ class DatabaseStore {
     const id = uuidv4();
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
+    const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
 
     sqlite.prepare('DELETE FROM otps WHERE phone = ?').run(phone);
     sqlite
       .prepare('INSERT INTO otps (id, phone, otp, expires_at, verified, created_at) VALUES (?, ?, ?, ?, 0, ?)')
-      .run(id, phone, otp, expiresAt, now.toISOString());
+      .run(id, phone, otpHash, expiresAt, now.toISOString());
 
     return { id, expiresAt };
   }
 
   public verifyOtp(phone: string, inputOtp: string): boolean {
     const row = sqlite
-      .prepare('SELECT * FROM otps WHERE phone = ? AND otp = ? AND verified = 0 ORDER BY created_at DESC LIMIT 1')
-      .get(phone, inputOtp) as any;
+      .prepare('SELECT * FROM otps WHERE phone = ? AND verified = 0 ORDER BY created_at DESC LIMIT 1')
+      .get(phone) as any;
 
     if (!row) return false;
 
     if (new Date(row.expires_at).getTime() < Date.now()) {
+      return false;
+    }
+
+    const maxAttempts = 5;
+    const attempts = typeof row.attempts === 'number' ? row.attempts : 0;
+    if (attempts >= maxAttempts) {
+      return false;
+    }
+
+    const inputHash = crypto.createHash('sha256').update(inputOtp).digest('hex');
+    if (row.otp !== inputHash) {
+      sqlite.prepare('UPDATE otps SET attempts = ? WHERE id = ?').run(attempts + 1, row.id);
       return false;
     }
 
