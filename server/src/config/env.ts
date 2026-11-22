@@ -21,6 +21,19 @@ for (const p of candidatePaths) {
   }
 }
 
+const clientOrigin = (() => {
+  const origin = process.env.CLIENT_ORIGIN || '*';
+  if (process.env.NODE_ENV === 'production') {
+    if (origin === '*') {
+      throw new Error('CLIENT_ORIGIN must be set to the app origin in production; wildcard CORS with credentials is not allowed');
+    }
+    if (!origin.startsWith('https://')) {
+      console.warn('[ENV] CLIENT_ORIGIN is not HTTPS. Terminate TLS in front of the server in production.');
+    }
+  }
+  return origin;
+})();
+
 const jwtSecret = (() => {
   if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
   if (process.env.NODE_ENV === 'production') {
@@ -33,7 +46,7 @@ const jwtSecret = (() => {
 export const ENV = {
   PORT: parseInt(process.env.PORT || '5000', 10),
   JWT_SECRET: jwtSecret,
-  CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || '*',
+  CLIENT_ORIGIN: clientOrigin,
   SUPABASE_URL: process.env.SUPABASE_URL || '',
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || '',
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
