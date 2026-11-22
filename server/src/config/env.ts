@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
@@ -20,9 +21,18 @@ for (const p of candidatePaths) {
   }
 }
 
+const jwtSecret = (() => {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET environment variable must be set in production');
+  }
+  console.warn('[ENV] JWT_SECRET is not set; using a random development secret. Set JWT_SECRET in .env to keep sessions valid across restarts.');
+  return crypto.randomBytes(32).toString('hex');
+})();
+
 export const ENV = {
   PORT: parseInt(process.env.PORT || '5000', 10),
-  JWT_SECRET: process.env.JWT_SECRET || 'vibematch_super_secure_jwt_secret_key_2026',
+  JWT_SECRET: jwtSecret,
   CLIENT_ORIGIN: process.env.CLIENT_ORIGIN || '*',
   SUPABASE_URL: process.env.SUPABASE_URL || '',
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || '',
