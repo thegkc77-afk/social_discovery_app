@@ -29,8 +29,8 @@ export interface User {
   age: number;
   avatar: string;
   detailImage?: string;
-  distance: string | null;
-  location: string | null;
+  distance: string;
+  location: string;
   online: boolean;
   vibes: string[];
   bio: string;
